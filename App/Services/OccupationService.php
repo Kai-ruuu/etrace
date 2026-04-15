@@ -148,6 +148,11 @@ class OccupationService
         ];
     }
 
+    public function findAll(): ?array
+    {
+        return array_map(fn($item) => $item->toArray(), Occupation::findAll($this->pdo));
+    }
+
     public function findById(int $id): ?array
     {
         $occupation = Occupation::findById($this->pdo, $id);

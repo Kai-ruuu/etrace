@@ -36,4 +36,9 @@ class OccupationController
             HttpResponse::ok($this->service->findAllNotAligned($schoolId, $courseId, $query, $page, $perPage));
         }
     }
+
+    public function showAbsoluteAll(): void
+    {
+        HttpResponse::ok($this->service->findAll());
+    }
 }

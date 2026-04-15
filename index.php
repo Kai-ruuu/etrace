@@ -152,7 +152,7 @@ $router->patch('/api/institution/graduate-record/archive/{id}', GraduateRecordCo
 
 // occupation
 $router->get('/api/institution/occupation', OccupationController::class, 'showAll', [AllowedOnlyMiddleware::make([Role::DEAN])]);
-// also make one for alumni access (without middleware)
+$router->get('/api/institution/occupation/all', OccupationController::class, 'showAbsoluteAll');
 
 // course occupation
 $router->post('/api/institution/course-occupation', CourseOccupationController::class, 'store', [AllowedOnlyMiddleware::make([Role::DEAN])]);
