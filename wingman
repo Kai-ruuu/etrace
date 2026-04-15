@@ -1,0 +1,623 @@
+#!/usr/bin/env php
+<?php
+
+use App\Core\UploadManager;
+
+require_once __DIR__ . "/vendor/autoload.php";
+
+$dotenv = Dotenv\Dotenv::createImmutable(__DIR__);
+$dotenv->load();
+
+// ── Config ────────────────────────────────────────────────────────────────────
+
+define('ROOT',            dirname(__FILE__));
+define('MODELS_DIR',      ROOT . '/App/Models');
+define('CONTROLLERS_DIR', ROOT . '/App/Controllers');
+define('SERVICES_DIR',    ROOT . '/App/Services');
+define('SEEDERS_DIR',     ROOT . '/App/Seeders');
+define('KIT_MODEL',       ROOT . '/Kit/Model.php');
+define('KIT_CONTROLLER',  ROOT . '/Kit/Controller.php');
+define('KIT_SERVICE',     ROOT . '/Kit/Service.php');
+define('KIT_SEEDER',      ROOT . '/Kit/Seeder.php');
+define('MIDDLEWARES_DIR', ROOT . '/App/Middlewares');
+define('KIT_MIDDLEWARE',  ROOT . '/Kit/BaseMiddleware.php');
+
+// Auto-load composer so Database, Migration, and models are available
+$autoload = ROOT . '/vendor/autoload.php';
+if (file_exists($autoload)) {
+    require_once $autoload;
+}
+
+// ── Helpers ───────────────────────────────────────────────────────────────────
+
+function info(string $msg): void  { echo "\033[32m[wingman]\033[0m {$msg}" . PHP_EOL; }
+function error(string $msg): void { echo "\033[31m[error]\033[0m {$msg}" . PHP_EOL; }
+function warn(string $msg): void  { echo "\033[33m[warn]\033[0m {$msg}" . PHP_EOL; }
+
+function usage(): void
+{
+    echo PHP_EOL;
+    echo "\033[33mWingman\033[0m" . PHP_EOL;
+    echo "────────────────────────────────────────────────────" . PHP_EOL;
+    echo "  \033[36mGeneration\033[0m" . PHP_EOL;
+    echo "    php wingman -nm  <ModelName>       Generate a new model" . PHP_EOL;
+    echo "    php wingman -nc  <ControllerName>  Generate a new controller" . PHP_EOL;
+    echo "    php wingman -nsv <ServiceName>     Generate a new service" . PHP_EOL;
+    echo "    php wingman -nsd <SeederName>      Generate a new seeder" . PHP_EOL;
+    echo "    php wingman -nmd <MiddlewareName>  Generate a new middleware" . PHP_EOL;
+    echo PHP_EOL;
+    echo "  \033[36mMigrations\033[0m" . PHP_EOL;
+    echo "    php wingman -ct                    Create all tables (dev)" . PHP_EOL;
+    echo "    php wingman -ct --prod             Create all tables (prod)" . PHP_EOL;
+    echo "    php wingman -dt                    Drop all tables (dev)" . PHP_EOL;
+    echo "    php wingman -dt --prod             Drop all tables (prod)" . PHP_EOL;
+    echo "    php wingman -rt                    Recreate all tables (dev) (drop then create)" . PHP_EOL;
+    echo "    php wingman -rt --prod             Recreate all tables (prod) (drop then create)" . PHP_EOL;
+    echo PHP_EOL;
+    echo "  \033[36mSeeders\033[0m" . PHP_EOL;
+    echo "    php wingman -rsd <SeederName>      Run a specific seeder (dev)" . PHP_EOL;
+    echo "    php wingman -rsd <SeederName> --prod  Run a specific seeder (prod)" . PHP_EOL;
+    echo "    php wingman -rasd                   Run all seeders (dev)" . PHP_EOL;
+    echo "    php wingman -rasd --prod            Run all seeders (prod)" . PHP_EOL;
+    echo PHP_EOL;
+    echo "  \033[36mServer\033[0m" . PHP_EOL;
+    echo "    php wingman -r                     Run (dev)" . PHP_EOL;
+    echo "    php wingman -r  --prod             Run (prod)" . PHP_EOL;
+    echo "    php wingman -iu                    Initialize uploads (dev)" . PHP_EOL;
+    echo "    php wingman -iu --prod             Initialize uploads (prod)" . PHP_EOL;
+    echo "    php wingman -ru                    Reset uploads (dev)" . PHP_EOL;
+    echo "    php wingman -ru --prod             Reset uploads (prod)" . PHP_EOL;
+    echo "    php wingman -is                    Initialize server (dev)" . PHP_EOL;
+    echo "    php wingman -is --prod             Initialize server (prod)" . PHP_EOL;
+    echo "    php wingman -rs                    Reset server (dev)" . PHP_EOL;
+    echo "    php wingman -rs --prod             Reset server (prod)" . PHP_EOL;
+    echo PHP_EOL;
+}
+
+// ── Arg Parsing ───────────────────────────────────────────────────────────────
+
+$args = array_slice($argv, 1);
+
+if (empty($args)) {
+    usage();
+    exit(1);
+}
+
+$flag = $args[0] ?? null;
+$name = $args[1] ?? null;
+$prod = in_array('--prod', $args);
+
+// ── Commands ──────────────────────────────────────────────────────────────────
+
+match($flag) {
+    '-nm'   => generateModel($name),
+    '-nc'   => generateController($name),
+    '-nsv'  => generateService($name),
+    '-nsd'  => generateSeeder($name),
+    '-ct'   => createTables($prod),
+    '-dt'   => dropTables($prod),
+    '-rt'   => recreateTables($prod),
+    '-rsd'  => runSeeder($name, $prod),
+    '-rasd' => runAllSeeders($prod),
+    '-r'    => run($prod),
+    '-iu'   => initializeUploads($prod),
+    '-ru'   => resetUploads($prod),
+    '-is'   => initializeServer($prod),
+    '-rs'   => resetServer($prod),
+    '-nmd'  => generateMiddleware($name),
+    default => unrecognized($flag),
+};
+
+// ── Generators ────────────────────────────────────────────────────────────────
+
+function generateModel(?string $name): void
+{
+    if (!$name) {
+        error("Model name is required. Usage: php wingman -nm <ModelName>");
+        exit(1);
+    }
+
+    $name = ucfirst($name);
+
+    if (!preg_match('/^[A-Za-z]+$/', $name)) {
+        error("Model name must contain letters only. Got: '{$name}'");
+        exit(1);
+    }
+
+    $kitPath    = KIT_MODEL;
+    $outputPath = MODELS_DIR . "/{$name}.php";
+    $tableName  = strtolower(preg_replace('/(?<!^)[A-Z]/', '_$0', $name)) . 's';
+
+    if (!file_exists($kitPath)) {
+        error("Kit template not found at: {$kitPath}");
+        exit(1);
+    }
+
+    if (file_exists($outputPath)) {
+        warn("Model already exists at: {$outputPath}");
+        exit(1);
+    }
+
+    if (!is_dir(MODELS_DIR)) {
+        mkdir(MODELS_DIR, 0755, true);
+        info("Created directory: " . MODELS_DIR);
+    }
+
+    $template = file_get_contents($kitPath);
+
+    $content = str_replace(
+        ['class Model', 'function fromRow', 'table_name'],
+        ["class {$name}", 'function fromRow', $tableName],
+        $template
+    );
+
+    if (file_put_contents($outputPath, $content) === false) {
+        error("Failed to write file at: {$outputPath}");
+        exit(1);
+    }
+
+    info("Model created      : App/Models/{$name}.php");
+    info("Table name         : {$tableName}");
+}
+
+function generateController(?string $name): void
+{
+    if (!$name) {
+        error("Controller name is required. Usage: php wingman -nc <ControllerName>");
+        exit(1);
+    }
+
+    $name = ucfirst($name);
+
+    if (str_ends_with($name, 'Controller')) {
+        $name = substr($name, 0, -strlen('Controller'));
+    }
+
+    if (!preg_match('/^[A-Za-z]+$/', $name)) {
+        error("Controller name must contain letters only. Got: '{$name}'");
+        exit(1);
+    }
+
+    $kitPath    = KIT_CONTROLLER;
+    $className  = "{$name}Controller";
+    $outputPath = CONTROLLERS_DIR . "/{$className}.php";
+
+    if (!file_exists($kitPath)) {
+        error("Kit template not found at: {$kitPath}");
+        exit(1);
+    }
+
+    if (file_exists($outputPath)) {
+        warn("Controller already exists at: {$outputPath}");
+        exit(1);
+    }
+
+    if (!is_dir(CONTROLLERS_DIR)) {
+        mkdir(CONTROLLERS_DIR, 0755, true);
+        info("Created directory: " . CONTROLLERS_DIR);
+    }
+
+    $template = file_get_contents($kitPath);
+
+    $content = str_replace(
+        'class Controller',
+        "class {$className}",
+        $template
+    );
+
+    if (file_put_contents($outputPath, $content) === false) {
+        error("Failed to write file at: {$outputPath}");
+        exit(1);
+    }
+
+    info("Controller created : App/Controllers/{$className}.php");
+}
+
+function generateService(?string $name): void
+{
+    if (!$name) {
+        error("Service name is required. Usage: php wingman -nsv <ServiceName>");
+        exit(1);
+    }
+
+    $name = ucfirst($name);
+
+    if (str_ends_with($name, 'Service')) {
+        $name = substr($name, 0, -strlen('Service'));
+    }
+
+    if (!preg_match('/^[A-Za-z]+$/', $name)) {
+        error("Service name must contain letters only. Got: '{$name}'");
+        exit(1);
+    }
+
+    $kitPath    = KIT_SERVICE;
+    $className  = "{$name}Service";
+    $outputPath = SERVICES_DIR . "/{$className}.php";
+
+    if (!file_exists($kitPath)) {
+        error("Kit template not found at: {$kitPath}");
+        exit(1);
+    }
+
+    if (file_exists($outputPath)) {
+        warn("Service already exists at: {$outputPath}");
+        exit(1);
+    }
+
+    if (!is_dir(SERVICES_DIR)) {
+        mkdir(SERVICES_DIR, 0755, true);
+        info("Created directory: " . SERVICES_DIR);
+    }
+
+    $template = file_get_contents($kitPath);
+
+    $content = str_replace(
+        'class Service',
+        "class {$className}",
+        $template
+    );
+
+    if (file_put_contents($outputPath, $content) === false) {
+        error("Failed to write file at: {$outputPath}");
+        exit(1);
+    }
+
+    info("Service created    : App/Services/{$className}.php");
+}
+
+function generateSeeder(?string $name): void
+{
+    if (!$name) {
+        error("Seeder name is required. Usage: php wingman -nsd <SeederName>");
+        exit(1);
+    }
+
+    $name = ucfirst($name);
+
+    if (str_ends_with($name, 'Seeder')) {
+        $name = substr($name, 0, -strlen('Seeder'));
+    }
+
+    if (!preg_match('/^[A-Za-z]+$/', $name)) {
+        error("Seeder name must contain letters only. Got: '{$name}'");
+        exit(1);
+    }
+
+    $kitPath    = KIT_SEEDER;
+    $className  = "{$name}Seeder";
+    $outputPath = SEEDERS_DIR . "/{$className}.php";
+
+    if (!file_exists($kitPath)) {
+        error("Kit template not found at: {$kitPath}");
+        exit(1);
+    }
+
+    if (file_exists($outputPath)) {
+        warn("Seeder already exists at: {$outputPath}");
+        exit(1);
+    }
+
+    if (!is_dir(SEEDERS_DIR)) {
+        mkdir(SEEDERS_DIR, 0755, true);
+        info("Created directory: " . SEEDERS_DIR);
+    }
+
+    $template = file_get_contents($kitPath);
+
+    $content = str_replace(
+        'class Seeder',
+        "class {$className}",
+        $template
+    );
+
+    if (file_put_contents($outputPath, $content) === false) {
+        error("Failed to write file at: {$outputPath}");
+        exit(1);
+    }
+
+    info("Seeder created     : App/Seeders/{$className}.php");
+}
+
+function generateMiddleware(?string $name): void
+{
+    if (!$name) {
+        error("Middleware name is required. Usage: php wingman -nmd <MiddlewareName>");
+        exit(1);
+    }
+
+    $name = ucfirst($name);
+
+    if (str_ends_with($name, 'Middleware')) {
+        $name = substr($name, 0, -strlen('Middleware'));
+    }
+
+    if (!preg_match('/^[A-Za-z]+$/', $name)) {
+        error("Middleware name must contain letters only. Got: '{$name}'");
+        exit(1);
+    }
+
+    $kitPath    = KIT_MIDDLEWARE;
+    $className  = "{$name}Middleware";
+    $outputPath = MIDDLEWARES_DIR . "/{$className}.php";
+
+    if (!file_exists($kitPath)) {
+        error("Kit template not found at: {$kitPath}");
+        exit(1);
+    }
+
+    if (file_exists($outputPath)) {
+        warn("Middleware already exists at: {$outputPath}");
+        exit(1);
+    }
+
+    if (!is_dir(MIDDLEWARES_DIR)) {
+        mkdir(MIDDLEWARES_DIR, 0755, true);
+        info("Created directory: " . MIDDLEWARES_DIR);
+    }
+
+    $template = file_get_contents($kitPath);
+
+    $content = str_replace(
+        ['class BaseMiddleware', "'middleware_label'"],
+        ["class {$className}", "'" . strtolower($name) . "'"],
+        $template
+    );
+
+    if (file_put_contents($outputPath, $content) === false) {
+        error("Failed to write file at: {$outputPath}");
+        exit(1);
+    }
+
+    info("Middleware created  : App/Middlewares/{$className}.php");
+}
+
+// ── Seeders ───────────────────────────────────────────────────────────────────
+
+function runSeeder(?string $name, bool $prod): void
+{
+    if (!$name) {
+        error("Seeder name is required. Usage: php wingman -rsd <SeederName>");
+        exit(1);
+    }
+
+    $name = ucfirst($name);
+
+    if (str_ends_with($name, 'Seeder')) {
+        $name = substr($name, 0, -strlen('Seeder'));
+    }
+
+    $className = "App\\Seeders\\{$name}Seeder";
+    $filePath  = SEEDERS_DIR . "/{$name}Seeder.php";
+
+    if (!file_exists($filePath)) {
+        error("Seeder not found at: {$filePath}");
+        exit(1);
+    }
+
+    if (!class_exists($className)) {
+        error("Seeder class '{$className}' not found. Did you run composer dump-autoload?");
+        exit(1);
+    }
+
+    $env = $prod ? 'production' : 'development';
+    info("Running \033[33m{$name}Seeder\033[0m on {$env}...");
+
+    if ($prod) {
+        echo "\033[31mAre you sure you want to seed PRODUCTION? (yes/no): \033[0m";
+        $confirm = trim(fgets(STDIN));
+        if ($confirm !== 'yes') {
+            warn("Aborted.");
+            exit(0);
+        }
+    }
+
+    try {
+        $pdo    = resolveDatabase($prod)->connect();
+        $seeder = new $className();
+        $seeder->seed($pdo);
+        info("{$name}Seeder completed successfully.");
+    } catch (\Exception $e) {
+        error("Seeder failed: " . $e->getMessage());
+        exit(1);
+    }
+}
+
+function runAllSeeders(bool $prod): void
+{
+    if (!is_dir(SEEDERS_DIR)) {
+        error("Seeders directory not found at: " . SEEDERS_DIR);
+        exit(1);
+    }
+
+    $files = glob(SEEDERS_DIR . '/*Seeder.php');
+
+    if (empty($files)) {
+        warn("No seeders found in: " . SEEDERS_DIR);
+        exit(0);
+    }
+
+    $env = $prod ? 'production' : 'development';
+    info("Running \033[33mall seeders\033[0m on {$env}...");
+
+    if ($prod) {
+        echo "\033[31mAre you sure you want to seed PRODUCTION? (yes/no): \033[0m";
+        $confirm = trim(fgets(STDIN));
+        if ($confirm !== 'yes') {
+            warn("Aborted.");
+            exit(0);
+        }
+    }
+
+    try {
+        $pdo = resolveDatabase($prod)->connect();
+    } catch (\Exception $e) {
+        error("Database connection failed: " . $e->getMessage());
+        exit(1);
+    }
+
+    usort($files, function ($a, $b) {
+        $classA = "App\\Seeders\\" . basename($a, '.php');
+        $classB = "App\\Seeders\\" . basename($b, '.php');
+        $orderA = property_exists($classA, 'order') ? $classA::$order : 99;
+        $orderB = property_exists($classB, 'order') ? $classB::$order : 99;
+        return $orderA <=> $orderB;
+    });
+
+    foreach ($files as $file) {
+        $name      = basename($file, '.php');
+        $className = "App\\Seeders\\{$name}";
+
+        if (!class_exists($className)) {
+            warn("Skipping {$name} — class not found. Did you run composer dump-autoload?");
+            continue;
+        }
+
+        try {
+            $seeder = new $className();
+            $seeder->seed($pdo);
+            info("{$name} \033[32m\033[0m");
+        } catch (\Exception $e) {
+            error("{$name} \033[31m\033[0m — " . $e->getMessage());
+        }
+    }
+
+    echo PHP_EOL;
+}
+
+// ── Migration ─────────────────────────────────────────────────────────────────
+
+function resolveDatabase(bool $prod): \App\Core\Database
+{
+    if ($prod) {
+        $dotenv = ROOT . '/.env';
+        if (file_exists($dotenv)) {
+            foreach (file($dotenv, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES) as $line) {
+                if (str_starts_with(trim($line), '#')) continue;
+                [$key, $val] = array_map('trim', explode('=', $line, 2));
+                $_ENV[$key]  = $val;
+            }
+        }
+        return \App\Core\Database::forProd();
+    }
+
+    return \App\Core\Database::forDev();
+}
+
+function createTables(bool $prod): void
+{
+    $env = $prod ? 'production' : 'development';
+    info("Running create tables on \033[33m{$env}\033[0m...");
+
+    if ($prod) {
+        echo "\033[31mAre you sure you want to run migrations on PRODUCTION? (yes/no): \033[0m";
+        $confirm = trim(fgets(STDIN));
+        if ($confirm !== 'yes') {
+            warn("Aborted.");
+            exit(0);
+        }
+    }
+
+    try {
+        $pdo      = resolveDatabase($prod)->connect();
+        $migrator = new \App\Core\Migrator($pdo);
+        $migrator->createTables();
+        info("All tables created successfully.");
+    } catch (\Exception $e) {
+        error("Migration failed: " . $e->getMessage());
+        exit(1);
+    }
+}
+
+function dropTables(bool $prod): void
+{
+    $env = $prod ? 'production' : 'development';
+    info("Running drop tables on \033[33m{$env}\033[0m...");
+
+    try {
+        $pdo = resolveDatabase($prod)->connect();
+        $pdo->exec("SET FOREIGN_KEY_CHECKS = 0");
+
+        $migrator = new \App\Core\Migrator($pdo);
+        $migrator->dropTables();
+
+        $pdo->exec("SET FOREIGN_KEY_CHECKS = 1");
+        info("All tables dropped successfully.");
+    } catch (\Exception $e) {
+        error("Drop failed: " . $e->getMessage());
+        exit(1);
+    }
+}
+
+function recreateTables(bool $prod): void
+{
+    dropTables($prod);
+    echo PHP_EOL;
+    createTables($prod);
+}
+
+// ── Server ────────────────────────────────────────────────────────────────────
+
+function run(bool $prod): void
+{
+    $host = $prod ? "0.0.0.0" : "localhost";
+    $port = 8000;
+
+    info("Starting server at \033[33mhttp://{$host}:{$port}\033[0m...");
+    exec("php -S {$host}:{$port} index.php");
+}
+
+function initializeUploads(bool $prod): void
+{
+    $env = $prod ? 'production' : 'development';
+    info("Running \033[33muploads initialization \033[0m on {$env}...");
+
+    $UploadManager = new UploadManager();
+
+    try {
+        $UploadManager->initialize();
+    } catch (Exception $e) {
+        $UploadManager->reset();
+        error_log('Failed: Unable to initialize uploads folder - ' . $e->getMessage());
+    }
+}
+
+function resetUploads(bool $prod): void
+{
+    $env = $prod ? 'production' : 'development';
+    info("Running \033[33muploads reset \033[0m on {$env}...");
+    
+    $UploadManager = new UploadManager();
+    $UploadManager->reset();
+
+    initializeUploads($prod);
+}
+
+function initializeServer($prod): void
+{
+    $env = $prod ? 'production' : 'development';
+    info("Running \033[33mserver initialization \033[0m on {$env}...");
+
+    initializeUploads($prod);
+    createTables($prod);
+    runAllSeeders($prod);
+}
+
+function resetServer($prod): void
+{
+    $env = $prod ? 'production' : 'development';
+    info("Running \033[33mserver reset \033[0m on {$env}...");
+
+    resetUploads($prod);
+    recreateTables($prod);
+    runAllSeeders($prod);
+}
+
+// ── Fallback ──────────────────────────────────────────────────────────────────
+
+function unrecognized(?string $flag): void
+{
+    error("Unrecognized flag: '{$flag}'");
+    usage();
+    exit(1);
+}
