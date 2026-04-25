@@ -163,6 +163,7 @@ class ProfileAlumni implements Migratable
                 address           = :address,
                 employment_status = :employment_status,
                 profile_picture   = :profile_picture,
+                cv                = :cv,
                 ver_stat_dean     = :ver_stat_dean
             WHERE id = :id
         ');
@@ -173,6 +174,7 @@ class ProfileAlumni implements Migratable
             ':address'           => $data["address"],
             ':employment_status' => $data["employment_status"],
             ':profile_picture'   => $data["profile_picture"],
+            ':cv'                => $data["cv"],
             ':ver_stat_dean'     => $data["ver_stat_dean"],
             ':id'                => $id,
         ]);

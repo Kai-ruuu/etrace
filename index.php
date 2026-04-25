@@ -16,9 +16,11 @@ use App\Controllers\JobPostController;
 use App\Controllers\JobPostCvSubmissionController;
 use App\Controllers\JobPostLikeController;
 use App\Controllers\OccupationController;
+use App\Controllers\OccupationStateController;
 use App\Controllers\PesoStaffController;
 use App\Controllers\QualificationController;
 use App\Controllers\SchoolController;
+use App\Controllers\SocialMediaController;
 use App\Controllers\SocialMediaPlatformController;
 use App\Controllers\SystemAdminController;
 use App\Controllers\TargetCourseController;
@@ -51,6 +53,7 @@ $router->post('/api/auth/register/alumni', AlumniController::class, 'store');
 // system admin
 $router->get('/api/user/system-admin', SystemAdminController::class, 'showAll', [AllowedOnlyMiddleware::make([Role::SYSTEM_ADMIN])]);
 $router->post('/api/user/system-admin', SystemAdminController::class, 'store', [AllowedOnlyMiddleware::make([Role::SYSTEM_ADMIN])]);
+$router->patch('/api/user/system-admin/edit-profile', SystemAdminController::class, 'editProfile', [AllowedOnlyMiddleware::make([Role::SYSTEM_ADMIN])]);
 $router->patch('/api/user/system-admin/enable/{id}', SystemAdminController::class, 'enable', [AllowedOnlyMiddleware::make([Role::SYSTEM_ADMIN])]);
 $router->patch('/api/user/system-admin/disable/{id}', SystemAdminController::class, 'disable', [AllowedOnlyMiddleware::make([Role::SYSTEM_ADMIN])]);
 $router->patch('/api/user/system-admin/agree-to-consent', SystemAdminController::class, 'agreeToConsent', [AllowedOnlyMiddleware::make([Role::SYSTEM_ADMIN])]);
@@ -58,6 +61,7 @@ $router->patch('/api/user/system-admin/agree-to-consent', SystemAdminController:
 // dean
 $router->get('/api/user/dean', DeanController::class, 'showAll', [AllowedOnlyMiddleware::make([Role::SYSTEM_ADMIN])]);
 $router->post('/api/user/dean', DeanController::class, 'store', [AllowedOnlyMiddleware::make([Role::SYSTEM_ADMIN])]);
+$router->patch('/api/user/dean/edit-profile', DeanController::class, 'editProfile', [AllowedOnlyMiddleware::make([Role::DEAN])]);
 $router->patch('/api/user/dean/enable/{id}', DeanController::class, 'enable', [AllowedOnlyMiddleware::make([Role::SYSTEM_ADMIN])]);
 $router->patch('/api/user/dean/disable/{id}', DeanController::class, 'disable', [AllowedOnlyMiddleware::make([Role::SYSTEM_ADMIN])]);
 $router->patch('/api/user/dean/agree-to-consent', DeanController::class, 'agreeToConsent', [AllowedOnlyMiddleware::make([Role::DEAN])]);
@@ -65,6 +69,7 @@ $router->patch('/api/user/dean/agree-to-consent', DeanController::class, 'agreeT
 // peso staff
 $router->get('/api/user/peso-staff', PesoStaffController::class, 'showAll', [AllowedOnlyMiddleware::make([Role::SYSTEM_ADMIN])]);
 $router->post('/api/user/peso-staff', PesoStaffController::class, 'store', [AllowedOnlyMiddleware::make([Role::SYSTEM_ADMIN])]);
+$router->patch('/api/user/peso-staff/edit-profile', PesoStaffController::class, 'editProfile', [AllowedOnlyMiddleware::make([Role::PESO_STAFF])]);
 $router->patch('/api/user/peso-staff/enable/{id}', PesoStaffController::class, 'enable', [AllowedOnlyMiddleware::make([Role::SYSTEM_ADMIN])]);
 $router->patch('/api/user/peso-staff/disable/{id}', PesoStaffController::class, 'disable', [AllowedOnlyMiddleware::make([Role::SYSTEM_ADMIN])]);
 $router->patch('/api/user/peso-staff/agree-to-consent', PesoStaffController::class, 'agreeToConsent', [AllowedOnlyMiddleware::make([Role::PESO_STAFF])]);
@@ -74,10 +79,13 @@ $router->get('/api/user/company', CompanyController::class, 'showAll', [AllowedO
 $router->get('/api/user/company/revision-requests', CompanyController::class, 'revisionRequests', [AllowedOnlyMiddleware::make([Role::COMPANY])]);
 $router->get('/api/user/company/{id}', CompanyController::class, 'show', [AllowedOnlyMiddleware::make([Role::SYSTEM_ADMIN, Role::PESO_STAFF])]);
 $router->get('/api/user/company/revision-info/{id}/{requirement_key}', CompanyController::class, 'revisionInfo', [AllowedOnlyMiddleware::make([Role::PESO_STAFF])]);
+$router->post('/api/user/company/renew-logo', CompanyController::class, 'renewLogo', [AllowedOnlyMiddleware::make([Role::COMPANY])]);
+$router->post('/api/user/company/revise-requirement', CompanyController::class, 'reviseRequirement', [AllowedOnlyMiddleware::make([Role::COMPANY])]);
 $router->post('/api/user/company', CompanyController::class, 'store');
 $router->post('/api/user/company/write-appeal-sysad', CompanyController::class, 'writeSysadRejectionAppeal', [AllowedOnlyMiddleware::make([Role::COMPANY])]);
 $router->post('/api/user/company/write-appeal-pstaff', CompanyController::class, 'writePstaffRejectionAppeal', [AllowedOnlyMiddleware::make([Role::COMPANY])]);
 $router->post('/api/user/company/write-appeal-revision/{id}', CompanyController::class, 'writePstaffRevisionAppeal', [AllowedOnlyMiddleware::make([Role::COMPANY])]);
+$router->patch('/api/user/company/renew-basic-info', CompanyController::class, 'renewBasicInfo', [AllowedOnlyMiddleware::make([Role::COMPANY])]);
 $router->patch('/api/user/company/approve/{id}/{requirement_key}', CompanyController::class, 'approveRequirement', [AllowedOnlyMiddleware::make([Role::PESO_STAFF])]);
 $router->patch('/api/user/company/request-revise/{id}/{requirement_key}', CompanyController::class, 'requestReviseRequirement', [AllowedOnlyMiddleware::make([Role::PESO_STAFF])]);
 $router->patch('/api/user/company/enable/{id}', CompanyController::class, 'enable', [AllowedOnlyMiddleware::make([Role::SYSTEM_ADMIN, Role::PESO_STAFF])]);
@@ -119,11 +127,14 @@ $router->delete('/api/target-course/{id}', TargetCourseController::class, 'destr
 $router->get('/api/user/alumni', AlumniController::class, 'showAll', [AllowedOnlyMiddleware::make([Role::DEAN, Role::COMPANY])]);
 $router->get('/api/user/alumni/{id}', AlumniController::class, 'show', [AllowedOnlyMiddleware::make([Role::DEAN, Role::COMPANY])]);
 $router->post('/api/user/company/write-appeal', AlumniController::class, 'writeRejectionAppeal', [AllowedOnlyMiddleware::make([Role::ALUMNI])]);
+$router->post('/api/user/alumni/renew-cv', AlumniController::class, 'renewCv', [AllowedOnlyMiddleware::make([Role::ALUMNI])]);
+$router->post('/api/user/alumni/renew-profile-picture', AlumniController::class, 'renewProfilePicture', [AllowedOnlyMiddleware::make([Role::ALUMNI])]);
 $router->patch('/api/user/alumni/enable/{id}', AlumniController::class, 'enable', [AllowedOnlyMiddleware::make([Role::DEAN])]);
 $router->patch('/api/user/alumni/disable/{id}', AlumniController::class, 'disable', [AllowedOnlyMiddleware::make([Role::DEAN])]);
 $router->patch('/api/user/alumni/verify/{id}', AlumniController::class, 'verify', [AllowedOnlyMiddleware::make([Role::DEAN])]);
 $router->patch('/api/user/alumni/reject/{id}', AlumniController::class, 'reject', [AllowedOnlyMiddleware::make([Role::DEAN])]);
 $router->patch('/api/user/alumni/pend/{id}', AlumniController::class, 'pend', [AllowedOnlyMiddleware::make([Role::DEAN])]);
+$router->patch('/api/user/alumni/renew-profile', AlumniController::class, 'renewProfile', [AllowedOnlyMiddleware::make([Role::ALUMNI])]);
 
 // school
 $router->get('/api/institution/school', SchoolController::class, 'showAll', [AllowedOnlyMiddleware::make([Role::SYSTEM_ADMIN])]);
@@ -154,12 +165,20 @@ $router->patch('/api/institution/graduate-record/archive/{id}', GraduateRecordCo
 $router->get('/api/institution/occupation', OccupationController::class, 'showAll', [AllowedOnlyMiddleware::make([Role::DEAN])]);
 $router->get('/api/institution/occupation/all', OccupationController::class, 'showAbsoluteAll');
 
+// occupation state
+$router->post('/api/occupation-state', OccupationStateController::class, 'store', [AllowedOnlyMiddleware::make([Role::ALUMNI])]);
+$router->patch('/api/occupation-state/{id}', OccupationStateController::class, 'update', [AllowedOnlyMiddleware::make([Role::ALUMNI])]);
+$router->delete('/api/occupation-state/delete/{id}', OccupationStateController::class, 'destroy', [AllowedOnlyMiddleware::make([Role::ALUMNI])]);
+
 // course occupation
 $router->post('/api/institution/course-occupation', CourseOccupationController::class, 'store', [AllowedOnlyMiddleware::make([Role::DEAN])]);
 $router->delete('/api/institution/course-occupation', CourseOccupationController::class, 'destroy', [AllowedOnlyMiddleware::make([Role::DEAN])]);
 
 // social media
 $router->get('/api/social-media/platforms', SocialMediaPlatformController::class, 'showAll');
+$router->post('/api/social-media', SocialMediaController::class, 'store', [AllowedOnlyMiddleware::make([Role::ALUMNI])]);
+$router->patch('/api/social-media/{id}', SocialMediaController::class, 'update', [AllowedOnlyMiddleware::make([Role::ALUMNI])]);
+$router->delete('/api/social-media/{id}', SocialMediaController::class, 'destroy', [AllowedOnlyMiddleware::make([Role::ALUMNI])]);
 
 $app = new App($router, $allowedOrigins);
 $app->run();

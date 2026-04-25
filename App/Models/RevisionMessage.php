@@ -74,7 +74,7 @@ class RevisionMessage implements Migratable
         $sql->execute([$id]);
 
         $rows = $sql->fetchAll();
-        return count($rows) > 0 ? array_map(fn($r) => self::fromRow($r), $rows) : null;
+        return count($rows) > 0 ? array_map(fn($r) => self::fromRow($r), $rows) : [];
     }
 
     public static function findByCompanyIdAndReqKey(PDO $pdo, int $id, RequirementKey $key): ?self

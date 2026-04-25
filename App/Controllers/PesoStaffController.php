@@ -134,4 +134,24 @@ class PesoStaffController
         
         HttpResponse::ok($this->userService->findById($user['id']));
     }
+
+    public function editProfile(Request $req, array $cont): void
+    {
+        $firstName  = Validator::requiredString('First Name', $req->fromBody('first_name'), 1, 50);
+        $middleName = Validator::string('Middle Name', $req->fromBody('middle_name'), 1, 50);
+        $lastName   = Validator::requiredString('Last Name', $req->fromBody('last_name'), 1, 50);
+
+        $profile = ProfilePesoStaff::findByUserId($this->pdo, $cont['user']['id']);
+
+        $profile->firstName  = $firstName;
+        $profile->middleName = $middleName;
+        $profile->lastName   = $lastName;
+
+        $updatedProfile = $this->pesoStaffProfileService->update($profile->id, $profile->toArray());
+
+        if (!$updatedProfile)
+            HttpResponse::server(['message' => 'Unable to update profile due to an error.']);
+
+        HttpResponse::ok($updatedProfile);
+    }
 }

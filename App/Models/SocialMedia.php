@@ -48,6 +48,34 @@ class SocialMedia implements Migratable
         return $instance;
     }
 
+    public static function findByAlumniIdAndPlatformId(PDO $pdo, int $alumniId, int $platformId): ?self
+    {
+        $sql = $pdo->prepare('
+            SELECT * FROM social_medias
+            WHERE
+                alumni_id = ? AND
+                platform_id = ?
+            LIMIT 1');
+        $sql->execute([$alumniId, $platformId]);
+
+        $row = $sql->fetch();
+        return $row ? self::fromRow($row) : null;
+    }
+
+    public static function findByIdAndAlumniId(PDO $pdo, int $id, int $alumniId): ?self
+    {
+        $sql = $pdo->prepare('
+            SELECT * FROM social_medias
+            WHERE
+                id = ? AND
+                alumni_id = ?
+            LIMIT 1');
+        $sql->execute([$id, $alumniId]);
+
+        $row = $sql->fetch();
+        return $row ? self::fromRow($row) : null;
+    }
+
     public static function findAllByAlumniId(PDO $pdo, int $id): array
     {
         $sql = $pdo->prepare('SELECT * FROM social_medias WHERE alumni_id = ?');
@@ -84,15 +112,26 @@ class SocialMedia implements Migratable
     {
         $sql = $pdo->prepare('
             UPDATE social_medias
-            SET url = ?
+            SET
+                url = ?,
+                platform_id = ?
             WHERE id = ?
         ');
         $sql->execute([
             $data['url'],
+            $data['platform_id'],
             $data['id']
         ]);
 
         return self::findById($pdo, $id);
+    }
+
+    public static function delete(PDO $pdo, int $id): bool
+    {
+        $sql = $pdo->prepare('DELETE FROM social_medias WHERE id = ?');
+        $sql->execute([$id]);
+
+        return $sql->rowCount() > 0;
     }
 
     public function toArray(): array

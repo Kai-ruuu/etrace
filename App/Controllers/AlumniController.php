@@ -14,8 +14,10 @@ use App\Core\Types\Role;
 use App\Core\Types\VerificationStatus;
 use App\Core\Upload;
 use App\Core\UploadHandler;
+use App\Core\UploadManager;
 use App\Core\Validator;
 use App\Models\Course;
+use App\Models\OccupationState;
 use App\Models\ProfileAlumni;
 use App\Models\RejectionMessageDean;
 use App\Models\RejectionMessageDeanAppeal;
@@ -24,6 +26,7 @@ use App\Models\Verification;
 use App\Services\MailingService;
 use App\Services\ProfileAlumniService;
 use App\Services\UserService;
+use App\Utils\ArrayLogger;
 use DateTime;
 use Exception;
 use PDO;
@@ -96,7 +99,7 @@ class AlumniController
         $studentNumber = Validator::requiredString('Student Number', $req->fromBody('student_number'), 5, 255);
         $phoneNumber = Validator::requiredString('Phone Number', $req->fromBody('phone_number'), 11, 25);
         $courseId = Validator::requiredInt('Course ID', $req->fromBody('course_id'), 1);
-        $graduationYear = Validator::requiredInt('Batch', $req->fromBody('batch'), 2007, (int) date('Y'));
+        $graduationYear = Validator::requiredInt('Batch', $req->fromBody('graduation_year'), 2007, (int) date('Y'));
         $civilStatus = Validator::requiredEnum('Civil Status', $req->fromBody('civil_status'), CivilStatus::class);
         $address = Validator::requiredString('Address', $req->fromBody('address'), 1, 512);
         $employmentStatus = Validator::requiredEnum('Employment Status', $req->fromBody('employment_status'), EmploymentStatus::class);
@@ -123,7 +126,7 @@ class AlumniController
         try {
             $birthDate = new DateTime($birthDate);
         } catch (Exception $e) {
-            HttpResponse::unprocessable(['message' => 'Inalid birhtdate date format.']);
+            HttpResponse::unprocessable(['message' => 'Invalid birhtdate date format.']);
         }
 
         $minDate = new DateTime();
@@ -385,5 +388,98 @@ class AlumniController
         }
 
         HttpResponse::ok($rejectionAppeal->toArray());
+    }
+
+    public function renewProfilePicture(Request $req, array $cont): void
+    {
+        $profile = ProfileAlumni::findByUserId($this->pdo, $cont['user']['id']);
+        
+        $uploads = new UploadHandler([
+            new Upload('Profile Picture', 'profile_picture', UploadsConfig::folder('profile_picture'), [Mime::PNG, Mime::JPG, Mime::JPEG])
+        ]);
+        $uploads->stage();
+
+        if (!empty($uploads->getErrors()))
+            HttpResponse::unprocessable(['message' => $uploads->getFirstError()]);
+        
+        $profileArray = $profile->toArray();
+        $oldProfPicName = $profileArray['profile_picture'];
+        $profileArray['profile_picture'] = $uploads->getFilename('profile_picture');
+
+        try {
+            $updatedProfile = $this->service->update($profile->id, $profileArray);
+            $uploads->commit();
+            UploadManager::deleteFile(UploadsConfig::folder('profile_picture') . "/{$oldProfPicName}");
+            HttpResponse::ok($updatedProfile);
+        } catch (Exception $e) {
+            $uploads->rollback();
+            HttpResponse::server(['message' => 'Unable to upload profile picture due to an error.']);
+        }
+    }
+
+    public function renewCv(Request $req, array $cont): void
+    {
+        $profile = ProfileAlumni::findByUserId($this->pdo, $cont['user']['id']);
+        
+        $uploads = new UploadHandler([
+            new Upload('Curriculum Vitae', 'cv', UploadsConfig::folder('cv'), [Mime::PDF], true, 10)
+        ]);
+        $uploads->stage();
+
+        if (!empty($uploads->getErrors()))
+            HttpResponse::unprocessable(['message' => $uploads->getFirstError()]);
+        
+        $profileArray = $profile->toArray();
+        $oldCvName = $profileArray['cv'];
+        $profileArray['cv'] = $uploads->getFilename('cv');
+
+        ArrayLogger::log($profileArray);
+
+        try {
+            $updatedProfile = $this->service->update($profile->id, $profileArray);
+            $uploads->commit();
+            $deletePath = UploadsConfig::folder('cv') . "/{$oldCvName}";
+
+            if (file_exists($deletePath)) {
+                UploadManager::deleteFile($deletePath);
+            }
+            
+            HttpResponse::ok($updatedProfile);
+        } catch (Exception $e) {
+            $uploads->rollback();
+            HttpResponse::server(['message' => 'Unable to upload cv due to an error.']);
+        }
+    }
+
+    public function renewProfile(Request $req, array $cont): void
+    {
+        ArrayLogger::log($req->body);
+        $civilStatus      = Validator::requiredEnum('Civil Status', $req->fromBody('civil_status'), CivilStatus::class);
+        $phoneNumber      = Validator::requiredString('Phone Number', $req->fromBody('phone_number'), 8, 25);
+        $address          = Validator::requiredString('Address', $req->fromBody('address'), 1, 512);
+        $employmentStatus = Validator::requiredEnum('Employment Status', $req->fromBody('employment_status'), EmploymentStatus::class);
+
+        $profile = ProfileAlumni::findByUserId($this->pdo, $cont['user']['id']);
+
+        if ($employmentStatus === EmploymentStatus::UNEMPLOYED) {
+            $occStates = OccupationState::findAllByAlumniId($this->pdo, $profile->id);
+            $isUnemployed = empty(array_filter($occStates, fn($os) => $os->isCurrent));
+
+            if (!$isUnemployed) {
+                HttpResponse::conflict(['message' => 'Setting your employment status to unemployed requires you to not have a current job.']);
+            }
+        }
+
+        $profile->civilStatus = $civilStatus;
+        $profile->phoneNumber = $phoneNumber;
+        $profile->address = $address;
+        $profile->employmentStatus = $employmentStatus;
+
+        $updatedProfile = $this->service->update($profile->id, $profile->toArray());
+
+        if (!$updatedProfile)
+            HttpResponse::server(['message' => 'Unable to update profile due to an error.']);
+
+        HttpResponse::ok($updatedProfile);
     }
 }

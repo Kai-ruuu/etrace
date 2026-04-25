@@ -78,6 +78,37 @@ class OccupationState implements Migratable
         return $row ? self::fromRow($row) : null;
     }
 
+    public static function findByNameAndAlumniId(PDO $pdo, string $name, int $alumniId): ?self
+    {
+        $sql = $pdo->prepare('
+            SELECT os.* FROM occupation_states os
+            JOIN occupations o ON o.id = os.occupation_id
+            WHERE
+                LOWER(o.name) = LOWER(?) AND
+                os.alumni_id = ?
+            LIMIT 1
+        ');
+        $sql->execute([$name, $alumniId]);
+
+        $row = $sql->fetch();
+        return $row ? self::fromRow($row) : null;
+    }
+
+    public static function findByIdAndAlumniId(PDO $pdo, int $id, int $alumniId): ?self
+    {
+        $sql = $pdo->prepare('
+            SELECT * FROM occupation_states
+            WHERE
+                id = ? AND
+                alumni_id = ?
+            LIMIT 1
+        ');
+        $sql->execute([$id, $alumniId]);
+
+        $row = $sql->fetch();
+        return $row ? self::fromRow($row) : null;
+    }
+
     public static function findAllByAlumniId(PDO $pdo, int $id): array
     {
         $sql = $pdo->prepare('SELECT * FROM occupation_states WHERE alumni_id = ?');
@@ -119,13 +150,19 @@ class OccupationState implements Migratable
         $sql = $pdo->prepare('
             UPDATE occupation_states
             SET
-                start_year    = ?
-                end_year      = ?
+                company       = ?,
+                address       = ?,
+                occupation_id = ?,
+                start_year    = ?,
+                end_year      = ?,
                 is_current    = ?
             WHERE id = ?
         ');
 
         $sql->execute([
+            $data['company'],
+            $data['address'],
+            $data['occupation_id'],
             $data['start_year'],
             $data['end_year'],
             $data['is_current'],
@@ -133,6 +170,14 @@ class OccupationState implements Migratable
         ]);
 
         return self::findById($pdo, $id);
+    }
+
+    public static function delete(PDO $pdo, int $id): bool
+    {
+        $sql = $pdo->prepare('DELETE FROM occupation_states WHERE id = ?');
+        $sql->execute([$id]);
+
+        return $sql->rowCount() > 0;
     }
 
     public function toArray(): array

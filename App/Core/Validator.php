@@ -74,7 +74,7 @@ class Validator
         if (empty($value)) return null;
         
         if ($minimum !== null && strlen($value) < $minimum) {
-            HttpResponse::Unprocessable(['message' => $label . ' should be at least ' . $minimum . ' characters.']);
+            HttpResponse::Unprocessable(['message' => $label . ' should have at least ' . $minimum . ' characters.']);
         }
 
         if ($maximum !== null && strlen($value) > $maximum) {
@@ -142,9 +142,9 @@ class Validator
         return self::float($label, $value, $minimum, $maximum);
     }
 
-    public static function requiredBool(string $label, ?string $value): bool
+    public static function requiredBool(string $label, ?string $value): ?bool
     {
-        if (empty($value)) {
+        if ($value === null) {
             HttpResponse::unprocessable(['message' => $label . ' is required.']);
         }
 

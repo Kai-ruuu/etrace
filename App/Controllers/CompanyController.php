@@ -13,6 +13,7 @@ use App\Core\Types\Role;
 use App\Core\Types\VerificationStatus;
 use App\Core\Upload;
 use App\Core\UploadHandler;
+use App\Core\UploadManager;
 use App\Core\Validator;
 use App\Models\ProfileCompany;
 use App\Models\ProfilePesoStaff;
@@ -89,15 +90,15 @@ class CompanyController
         
         $uploads = new UploadHandler([
             new Upload('Logo',                                      'logo',       UploadsConfig::folder('logo'),      [Mime::PNG, Mime::JPG, Mime::JPEG]),
-            new Upload('Company Profile',                           'profile',    UploadsConfig::folder('profile'),   [Mime::PDF]),
-            new Upload('Business Permit',                           'permit',     UploadsConfig::folder('permit'),    [Mime::PDF]),
-            new Upload('SEC',                                       'sec',        UploadsConfig::folder('sec'),       [Mime::PDF]),
-            new Upload('DTI / CDA Reg.',                            'dti',        UploadsConfig::folder('dti'),       [Mime::PDF]),
-            new Upload('Registry of Establishment fr. DOLE',        'reg_est',    UploadsConfig::folder('reg_est'),   [Mime::PDF]),
-            new Upload('Certification from DOLE Provincial Office', 'cert_dole',  UploadsConfig::folder('cert_dole'), [Mime::PDF]),
-            new Upload('Certification of No Pending Case',          'cert_npc',   UploadsConfig::folder('cert_npc'),  [Mime::PDF]),
-            new Upload('Phil-JobNet Reg.',                          'reg_pjn',    UploadsConfig::folder('reg_pjn'),   [Mime::PDF]),
-            new Upload('List of Vacancies',                         'lov',        UploadsConfig::folder('lov'),       [Mime::PDF]),
+            new Upload('Company Profile',                           'profile',    UploadsConfig::folder('profile'),   [Mime::PDF], true, 10),
+            new Upload('Business Permit',                           'permit',     UploadsConfig::folder('permit'),    [Mime::PDF], true, 10),
+            new Upload('SEC',                                       'sec',        UploadsConfig::folder('sec'),       [Mime::PDF], true, 10),
+            new Upload('DTI / CDA Reg.',                            'dti',        UploadsConfig::folder('dti'),       [Mime::PDF], true, 10),
+            new Upload('Registry of Establishment fr. DOLE',        'reg_est',    UploadsConfig::folder('reg_est'),   [Mime::PDF], true, 10),
+            new Upload('Certification from DOLE Provincial Office', 'cert_dole',  UploadsConfig::folder('cert_dole'), [Mime::PDF], true, 10),
+            new Upload('Certification of No Pending Case',          'cert_npc',   UploadsConfig::folder('cert_npc'),  [Mime::PDF], true, 10),
+            new Upload('Phil-JobNet Reg.',                          'reg_pjn',    UploadsConfig::folder('reg_pjn'),   [Mime::PDF], true, 10),
+            new Upload('List of Vacancies',                         'lov',        UploadsConfig::folder('lov'),       [Mime::PDF], true, 10),
         ]);
         $uploads->stage();
 
@@ -510,6 +511,94 @@ class CompanyController
         $revisionInfo['appeal'] = $revisionAppeal ? $revisionAppeal->toArray() : null;
 
         HttpResponse::ok($revisionInfo);
+    }
+
+    public function renewBasicInfo(Request $req, array $cont): void
+    {
+        $name = Validator::requiredString('Company Name', $req->fromBody('name'), 1, 255);
+        $address = Validator::requiredString('Company Address', $req->fromBody('address'), 10, 512);
+
+        $profile = ProfileCompany::findByUserId($this->pdo, $cont['user']['id']);
+        $profile->name = $name;
+        $profile->address = $address;
+        $updatedProfile = $this->service->update($profile->id, $profile->toArray());
+
+        if (!$updatedProfile)
+            HttpResponse::server(['message' => 'Unable to update basic company information due to an error.']);
+
+        HttpResponse::ok($updatedProfile);
+    }
+
+    public function renewLogo(Request $req, array $cont): void
+    {
+        $profile = ProfileCompany::findByUserId($this->pdo, $cont['user']['id']);
+        
+        $uploads = new UploadHandler([
+            new Upload('Logo', 'logo', UploadsConfig::folder('logo'), [Mime::PNG, Mime::JPG, Mime::JPEG])
+        ]);
+        $uploads->stage();
+
+        if (!empty($uploads->getErrors()))
+            HttpResponse::unprocessable(['message' => $uploads->getFirstError()]);
+        
+        $profileArray = $profile->toArray();
+        $oldLogoName = $profileArray['logo'];
+        $profileArray['logo'] = $uploads->getFilename('logo');
+
+        try {
+            $updatedProfile = $this->service->update($profile->id, $profileArray);
+            $uploads->commit();
+            UploadManager::deleteFile(UploadsConfig::folder('logo') . "/{$oldLogoName}");
+            HttpResponse::ok($updatedProfile);
+        } catch (Exception $e) {
+            $uploads->rollback();
+            HttpResponse::server(['message' => 'Unable to upload logo due to an error.']);
+        }
+    }
+
+    public function reviseRequirement(Request $req, array $cont): void
+    {
+        $fileKey = Validator::requiredEnum('Requirement Key', $req->fromBody('requirement_key'), RequirementKey::class);
+        $folderName = [
+            'req_company_profile'   => 'profile',
+            'req_business_permit'   => 'permit',
+            'req_sec'               => 'sec',
+            'req_dti_cda'           => 'dti',
+            'req_reg_of_est'        => 'reg_est',
+            'req_cert_from_dole'    => 'cert_dole',
+            'req_cert_no_case'      => 'cert_npc',
+            'req_philjobnet_reg'    => 'reg_pjn',
+            'req_list_of_vacancies' => 'lov',
+        ];
+
+        $profile = ProfileCompany::findByUserId($this->pdo, $cont['user']['id']);
+        
+        $uploads = new UploadHandler([
+            new Upload('Requirment', 'requirement', UploadsConfig::folder($folderName[$fileKey->value]), [Mime::PDF], true, 10)
+        ]);
+        $uploads->stage();
+
+        if (!empty($uploads->getErrors()))
+            HttpResponse::unprocessable(['message' => $uploads->getFirstError()]);
+
+        $profileArray = $profile->toArray();
+
+        $oldRequirementName = $profileArray[$fileKey->value];
+        
+        $profileArray['ver_stat_pstaff'] = VerificationStatus::PENDING->value;
+        $profileArray[$fileKey->value] = $uploads->getFilename('requirement');
+        $profileArray['stat_' . $fileKey->value] = ApprovalStatus::PENDING->value;
+
+        try {
+            $updatedProfile = $this->service->update($profile->id, $profileArray);
+            RevisionMessage::deleteAllByCompanyIdAndRequirementKey($this->pdo, $profile->id, $fileKey);
+            $uploads->commit();
+            UploadManager::deleteFile(UploadsConfig::folder($folderName[$fileKey->value]) . "/{$oldRequirementName}");
+            HttpResponse::ok($updatedProfile);
+        } catch (Exception $e) {
+            $uploads->rollback();
+            HttpResponse::server(['message' => 'Unable to upload requirement due to an error.']);
+        }
     }
 
     public function writePstaffRevisionAppeal(Request $req, array $cont): void

@@ -33,6 +33,16 @@ class UploadManager
         error_log('Reset: Uploads folder has been reset');
     }
 
+    public static function deleteFile($filePath): bool
+    {
+        if (!file_exists($filePath)) {
+            return false;
+        }
+
+        unlink($filePath);
+        return true;
+    }
+
     private static function createFolder($name, $path)
     {
         if (is_dir($path)) {

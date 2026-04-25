@@ -182,7 +182,7 @@ class ProfileCompanyService
     public function update(int $id, array $data): ?array
     {
         $updatedProfile = ProfileCompany::update($this->pdo, $id, $data);
-        return $updatedProfile ? $updatedProfile->toArray() : null;
+        return $updatedProfile ? $this->attachRequired($updatedProfile) : null;
     }
 
     public function reject(int $id, array $data): ?array
