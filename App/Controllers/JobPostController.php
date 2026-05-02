@@ -9,6 +9,8 @@ use App\Core\Types\WorkSetup;
 use App\Core\Types\WorkShift;
 use App\Core\Validator;
 use App\Models\JobPost;
+use App\Models\JobPostCvSubmission;
+use App\Models\JobPostLike;
 use App\Services\JobPostService;
 use DateTime;
 use Exception;
@@ -85,6 +87,9 @@ class JobPostController
 
         if (!$updatedJobPost)
             HttpResponse::server(['message' => 'Unable to close post due to an error.']);
+
+        JobPostLike::deleteAllWithPostId($this->pdo, $jobPostId);
+        JobPostCvSubmission::deleteAllWithPostId($this->pdo, $jobPostId);
 
         HttpResponse::ok($this->service->findById($jobPostId));
     }

@@ -35,6 +35,6 @@ class JobPostLikeService
         $likes = JobPostLike::findAllByAlumniId($this->pdo, $id);
         return $likes
             ? array_map(fn($sub) => $this->attachRequired($sub), $likes)
-            : null;
+            : [];
     }
 }

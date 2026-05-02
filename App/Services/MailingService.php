@@ -7,12 +7,10 @@ use PHPMailer\PHPMailer\PHPMailer;
 
 class MailingService
 {
-    public $host;
-    public $port;
-    public $username;
-    public $password;
-    public $smtpAuth;
-    public $smtpSecure;
+    public string $host;
+    public string $port;
+    public string $username;
+    public string $password;
     
     protected PHPMailer $mail;
 
@@ -60,7 +58,7 @@ class MailingService
         $this->mail->Port = $port;
     }
 
-    public function send($to, $toName, $from, $subject, $body): bool
+    public function send(string $to, string $toName, string $from, string $subject, mixed $body): bool
     {
         try {
             $this->mail->clearAddresses();
@@ -78,7 +76,7 @@ class MailingService
         }
     }
 
-    public function sendNewlyAssignedWithEmailVerification($sysad, $user, $defaultPassword, $emailVerificationUrl): bool
+    public function sendNewlyAssignedWithEmailVerification(array $sysad, array $user, string $defaultPassword, string $emailVerificationUrl): bool
     {
         $sEmail     = $sysad['email'];
         $sFullName  = htmlspecialchars($sysad['profile']['first_name'] . ' ' . $sysad['profile']['last_name']);
@@ -95,7 +93,6 @@ class MailingService
 
         $subject = "You Have Been Assigned as {$uRole} on E-trace+";
 
-        // 3. Email Template
         $body = <<<HTML
         <!DOCTYPE html>
         <html lang="en">
@@ -188,7 +185,7 @@ class MailingService
         return $this->send($uEmail, $uFirstName, $sEmail, $subject, $body);
     }
 
-    public function sendEmailVerified($user, $loginUrl): bool
+    public function sendEmailVerified(array $user, string $loginUrl): bool
     {
         $uEmail     = $user['email'];
         $uFirstName = htmlspecialchars($user['profile']['first_name']);
@@ -271,7 +268,7 @@ class MailingService
         return $this->send($uEmail, $uFirstName, $this->username, $subject, $body);
     }
 
-    public function sendNewlyRegisteredCompanyWithEmailVerification($user, $emailVerificationUrl): bool
+    public function sendNewlyRegisteredCompanyWithEmailVerification(array $user, string $emailVerificationUrl): bool
     {
         $uEmail      = $user['email'];
         $companyName = htmlspecialchars($user['profile']['name']);
@@ -352,7 +349,7 @@ class MailingService
         return $this->send($uEmail, $companyName, $this->username, $subject, $body);
     }
 
-    public function sendNewlyRegisteredAlumniWithEmailVerification($user, $emailVerificationUrl): bool
+    public function sendNewlyRegisteredAlumniWithEmailVerification(array $user, string $emailVerificationUrl): bool
     {
         $uEmail   = $user['email'];
         $userName = htmlspecialchars($user['profile']['first_name']);
@@ -398,6 +395,7 @@ class MailingService
                                                 <p style="margin:0 0 16px; font-size:14px; color:#166534; line-height:1.5;">
                                                     Please confirm your email address to activate your portal and start exploring jobs.
                                                 </p>
+                                                
                                                 <table cellpadding="0" cellspacing="0" align="center">
                                                     <tr>
                                                         <td style="background-color:#111827; border-radius:6px;">
@@ -423,6 +421,289 @@ class MailingService
                                     </p>
                                 </td>
                             </tr>
+                        </table>
+                    </td>
+                </tr>
+            </table>
+        </body>
+        </html>
+        HTML;
+
+        return $this->send($uEmail, $userName, $this->username, $subject, $body);
+    }
+
+    public function sendExistingWithEmailVerification(array $user, string $emailVerificationUrl): bool
+    {
+        $uEmail     = $user['email'];
+
+        if ($user['role'] === 'company')
+            $uFirstName = htmlspecialchars($user['profile']['name']);
+        else
+            $uFirstName = htmlspecialchars($user['profile']['first_name']);
+        
+
+        $subject = "Verify Your E-trace+ Email Address";
+
+        $body = <<<HTML
+        <!DOCTYPE html>
+        <html lang="en">
+        <head>
+            <meta charset="UTF-8">
+            <meta name="viewport" content="width=device-width, initial-scale=1.0">
+            <title>{$subject}</title>
+        </head>
+        <body style="margin:0; padding:0; background-color:#f9fafb; font-family: Arial, sans-serif;">
+            <table width="100%" cellpadding="0" cellspacing="0" style="background-color:#f9fafb; padding: 40px 0;">
+                <tr>
+                    <td align="center">
+                        <table width="560" cellpadding="0" cellspacing="0" style="background-color:#ffffff; border-radius:8px; border: 1px solid #e5e7eb; overflow:hidden;">
+                            <tr>
+                                <td style="background-color:#ffffff; padding: 24px 32px; border-bottom: 1px solid #e5e7eb;">
+                                    <table width="100%" cellpadding="0" cellspacing="0">
+                                        <tr>
+                                            <td><span style="font-size:18px; font-weight:700; color:#111827; letter-spacing:1px;">E-trace+</span></td>
+                                            <td align="right">
+                                                <span style="display:inline-block; background-color:#dbeafe; color:#1d4ed8; font-size:11px; font-weight:600; padding:4px 10px; border-radius:999px; text-transform:uppercase; letter-spacing:1px;">Email Verification</span>
+                                            </td>
+                                        </tr>
+                                    </table>
+                                </td>
+                            </tr>
+                            <tr>
+                                <td style="padding: 32px;">
+                                    <p style="margin:0 0 16px; font-size:14px; color:#6b7280;">Hello {$uFirstName},</p>
+                                    <p style="margin:0 0 24px; font-size:15px; color:#111827; line-height:1.6;">
+                                        You recently requested a new email verification link for your <strong>E-trace+</strong> account.
+                                        Please click the button below to verify your email address.
+                                    </p>
+
+                                    <table width="100%" cellpadding="0" cellspacing="0" style="margin-bottom:24px;">
+                                        <tr>
+                                            <td style="background-color:#f0f9ff; border:1px solid #bae6fd; border-left: 3px solid #0ea5e9; border-radius:6px; padding:16px;">
+                                                <p style="margin:0 0 8px; font-size:11px; font-weight:700; color:#9ca3af; text-transform:uppercase; letter-spacing:1px;">Verify Your Email</p>
+                                                <p style="margin:0 0 12px; font-size:14px; color:#374151; line-height:1.6;">
+                                                    This verification link expires in <strong>24 hours</strong>.
+                                                    If you did not request this, you can safely ignore this email.
+                                                </p>
+                                                <table cellpadding="0" cellspacing="0">
+                                                    <tr>
+                                                        <td style="background-color:#0ea5e9; border-radius:6px;">
+                                                            <a href="{$emailVerificationUrl}" style="display:inline-block; padding:10px 20px; font-size:13px; font-weight:600; color:#ffffff; text-decoration:none;">Verify Email Address</a>
+                                                        </td>
+                                                    </tr>
+                                                </table>
+                                            </td>
+                                        </tr>
+                                    </table>
+
+                                    <p style="margin:0; font-size:13px; color:#6b7280; line-height:1.6;">
+                                        If the button above doesn't work, copy and paste the link below into your browser:<br>
+                                        <a href="{$emailVerificationUrl}" style="color:#0ea5e9; word-break:break-all;">{$emailVerificationUrl}</a>
+                                    </p>
+                                </td>
+                            </tr>
+                            <tr>
+                                <td style="background-color:#f9fafb; border-top:1px solid #e5e7eb; padding:20px 32px;">
+                                    <p style="margin:0; font-size:12px; color:#9ca3af; line-height:1.5;">This is an automated message from E-trace+. Please do not reply directly to this email.</p>
+                                </td>
+                            </tr>
+                        </table>
+                    </td>
+                </tr>
+            </table>
+        </body>
+        </html>
+        HTML;
+
+        return $this->send($uEmail, $uFirstName, $this->username, $subject, $body);
+    }
+    
+    public function sendForgotPasswordResetLink(array $user, string $passwordResetUrl): bool
+    {
+        $uEmail = $user['email'];
+
+        if ($user['role'] === 'company')
+            $userName = htmlspecialchars($user['profile']['name']);
+        else
+            $userName = htmlspecialchars($user['profile']['first_name']);
+
+        $subject = "Reset Your Password - E-trace+";
+
+        $body = <<<HTML
+        <!DOCTYPE html>
+        <html lang="en">
+        <head>
+            <meta charset="UTF-8">
+            <meta name="viewport" content="width=device-width, initial-scale=1.0">
+            <title>{$subject}</title>
+        </head>
+        <body style="margin:0; padding:0; background-color:#f9fafb; font-family: Arial, sans-serif;">
+            <table width="100%" cellpadding="0" cellspacing="0" style="background-color:#f9fafb; padding: 40px 0;">
+                <tr>
+                    <td align="center">
+                        <table width="560" cellpadding="0" cellspacing="0" style="background-color:#ffffff; border-radius:8px; border: 1px solid #e5e7eb; overflow:hidden;">
+
+                            <!-- Header -->
+                            <tr>
+                                <td style="background-color:#ffffff; padding: 24px 32px; border-bottom: 1px solid #e5e7eb;">
+                                    <table width="100%" cellpadding="0" cellspacing="0">
+                                        <tr>
+                                            <td><span style="font-size:18px; font-weight:700; color:#111827; letter-spacing:1px;">E-trace+</span></td>
+                                            <td align="right">
+                                                <span style="display:inline-block; background-color:#dcfce7; color:#15803d; font-size:11px; font-weight:600; padding:4px 10px; border-radius:999px; text-transform:uppercase; letter-spacing:1px;">Alumni Portal</span>
+                                            </td>
+                                        </tr>
+                                    </table>
+                                </td>
+                            </tr>
+
+                            <!-- Body -->
+                            <tr>
+                                <td style="padding: 32px;">
+                                    <p style="margin:0 0 16px; font-size:14px; color:#6b7280;">Hi {$userName},</p>
+                                    <p style="margin:0 0 24px; font-size:15px; color:#111827; line-height:1.6;">
+                                        We received a request to reset the password for your <strong>E-trace+</strong> account.
+                                        Click the button below to choose a new password and regain access to your account.
+                                    </p>
+
+                                    <!-- Reset Button Card -->
+                                    <table width="100%" cellpadding="0" cellspacing="0" style="margin-bottom:24px;">
+                                        <tr>
+                                            <td style="background-color:#f0fdf4; border:1px solid #bbf7d0; border-left: 3px solid #22c55e; border-radius:6px; padding:20px; text-align:center;">
+                                                <p style="margin:0 0 16px; font-size:14px; color:#166534; line-height:1.5;">
+                                                    This password reset link is valid for <strong>60 minutes</strong>. Please act promptly.
+                                                </p>
+                                                <table cellpadding="0" cellspacing="0" align="center">
+                                                    <tr>
+                                                        <td style="background-color:#111827; border-radius:6px;">
+                                                            <a href="{$passwordResetUrl}" style="display:inline-block; padding:12px 30px; font-size:14px; font-weight:600; color:#ffffff; text-decoration:none;">Reset My Password</a>
+                                                        </td>
+                                                    </tr>
+                                                </table>
+                                                <p style="margin:16px 0 0; font-size:12px; color:#6b7280; word-break:break-all;">
+                                                    Or copy and paste this link into your browser:<br>
+                                                    <a href="{$passwordResetUrl}" style="color:#22c55e;">{$passwordResetUrl}</a>
+                                                </p>
+                                            </td>
+                                        </tr>
+                                    </table>
+
+                                    <!-- Didn't request this -->
+                                    <p style="margin:0 0 12px; font-size:13px; color:#6b7280; line-height:1.5;">
+                                        <strong>Didn't request this?</strong><br>
+                                        If you did not request a password reset, you can safely ignore this email.
+                                        Your account will remain secure and no changes will be made.
+                                    </p>
+                                </td>
+                            </tr>
+
+                            <!-- Footer -->
+                            <tr>
+                                <td style="background-color:#f9fafb; border-top:1px solid #e5e7eb; padding:20px 32px;">
+                                    <p style="margin:0; font-size:12px; color:#9ca3af; line-height:1.5;">
+                                        <strong>Registered Email:</strong> {$uEmail}<br>
+                                        This is an automated message from E-trace+. Please do not reply directly to this email.
+                                    </p>
+                                </td>
+                            </tr>
+
+                        </table>
+                    </td>
+                </tr>
+            </table>
+        </body>
+        </html>
+        HTML;
+
+        return $this->send($uEmail, $userName, $this->username, $subject, $body);
+    }
+
+    public function sendPasswordResetSuccess(array $user): bool
+    {
+        $uEmail = $user['email'];
+
+        if ($user['role'] === 'company')
+            $userName = htmlspecialchars($user['profile']['name']);
+        else
+            $userName = htmlspecialchars($user['profile']['first_name']);
+
+        $subject = "Your Password Has Been Reset - E-trace+";
+
+        $body = <<<HTML
+        <!DOCTYPE html>
+        <html lang="en">
+        <head>
+            <meta charset="UTF-8">
+            <meta name="viewport" content="width=device-width, initial-scale=1.0">
+            <title>{$subject}</title>
+        </head>
+        <body style="margin:0; padding:0; background-color:#f9fafb; font-family: Arial, sans-serif;">
+            <table width="100%" cellpadding="0" cellspacing="0" style="background-color:#f9fafb; padding: 40px 0;">
+                <tr>
+                    <td align="center">
+                        <table width="560" cellpadding="0" cellspacing="0" style="background-color:#ffffff; border-radius:8px; border: 1px solid #e5e7eb; overflow:hidden;">
+
+                            <!-- Header -->
+                            <tr>
+                                <td style="background-color:#ffffff; padding: 24px 32px; border-bottom: 1px solid #e5e7eb;">
+                                    <table width="100%" cellpadding="0" cellspacing="0">
+                                        <tr>
+                                            <td><span style="font-size:18px; font-weight:700; color:#111827; letter-spacing:1px;">E-trace+</span></td>
+                                            <td align="right">
+                                                <span style="display:inline-block; background-color:#dcfce7; color:#15803d; font-size:11px; font-weight:600; padding:4px 10px; border-radius:999px; text-transform:uppercase; letter-spacing:1px;">Password Reset</span>
+                                            </td>
+                                        </tr>
+                                    </table>
+                                </td>
+                            </tr>
+
+                            <!-- Body -->
+                            <tr>
+                                <td style="padding: 32px;">
+                                    <p style="margin:0 0 16px; font-size:14px; color:#6b7280;">Hi {$userName},</p>
+                                    <p style="margin:0 0 24px; font-size:15px; color:#111827; line-height:1.6;">
+                                        Your <strong>E-trace+</strong> account password has been successfully reset.
+                                        You can now log in using your new password.
+                                    </p>
+
+                                    <!-- Success Notice -->
+                                    <table width="100%" cellpadding="0" cellspacing="0" style="margin-bottom:24px;">
+                                        <tr>
+                                            <td style="background-color:#f0fdf4; border:1px solid #bbf7d0; border-left: 3px solid #22c55e; border-radius:6px; padding:16px;">
+                                                <p style="margin:0 0 4px; font-size:11px; font-weight:700; color:#9ca3af; text-transform:uppercase; letter-spacing:1px;">What just happened</p>
+                                                <p style="margin:0; font-size:14px; color:#166534; line-height:1.6;">
+                                                    Your password was successfully changed. This change took effect immediately.
+                                                </p>
+                                            </td>
+                                        </tr>
+                                    </table>
+
+                                    <!-- Security Warning -->
+                                    <table width="100%" cellpadding="0" cellspacing="0" style="margin-bottom:24px;">
+                                        <tr>
+                                            <td style="background-color:#fefce8; border:1px solid #fde68a; border-left: 3px solid #eab308; border-radius:6px; padding:16px;">
+                                                <p style="margin:0 0 4px; font-size:11px; font-weight:700; color:#9ca3af; text-transform:uppercase; letter-spacing:1px;">Wasn't you?</p>
+                                                <p style="margin:0; font-size:14px; color:#854d0e; line-height:1.6;">
+                                                    If you did not request this change, your account may be compromised.
+                                                    Please contact our support team immediately to secure your account.
+                                                </p>
+                                            </td>
+                                        </tr>
+                                    </table>
+
+                                </td>
+                            </tr>
+
+                            <!-- Footer -->
+                            <tr>
+                                <td style="background-color:#f9fafb; border-top:1px solid #e5e7eb; padding:20px 32px;">
+                                    <p style="margin:0; font-size:12px; color:#9ca3af; line-height:1.5;">
+                                        <strong>Registered Email:</strong> {$uEmail}<br>
+                                        This is an automated message from E-trace+. Please do not reply directly to this email.
+                                    </p>
+                                </td>
+                            </tr>
+
                         </table>
                     </td>
                 </tr>

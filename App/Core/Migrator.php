@@ -23,6 +23,7 @@ class Migrator
         \App\Models\ProfileAlumni::class,
 
         \App\Models\Verification::class,
+        \App\Models\PasswordReset::class,
 
         \App\Models\Occupation::class,
         \App\Models\OccupationState::class,

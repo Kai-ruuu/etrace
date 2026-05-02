@@ -115,6 +115,9 @@ class JobPostCvSubmissionController
 
         $submission = JobPostCvSubmission::findByAlumniAndPostId($this->pdo, $profileId, $jobPostId);
 
+        if (!$submission)
+            HttpResponse::notFound(['message' => 'CV submission not found.']);
+
         if ($submission->status === CvReviewStatus::REVIEWED)
             HttpResponse::forbidden(['message' => 'Unable to unsubmit CV. Your CV has been reviewed already.']);
 

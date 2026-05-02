@@ -108,6 +108,13 @@ class JobPostCvSubmission implements Migratable
         return $sql->rowCount() > 0;
     }
 
+    public static function deleteAllWithPostId(PDO $pdo, int $jobPostId): bool
+    {
+        $sql = $pdo->prepare('DELETE FROM job_post_cv_submissions WHERE job_post_id = ?');
+        $sql->execute([$jobPostId]);
+        return $sql->rowCount() > 0;
+    }
+
     public function toArray(): array
     {
         return [

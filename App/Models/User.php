@@ -132,7 +132,7 @@ class User implements Migratable
         ');
 
         return $sql->execute([
-            ':password_hash' => password_hash($newPassword, PASSWORD_BCRYPT),
+            ':password_hash' => $newPassword,
             ':id'            => $id,
         ]);
     }

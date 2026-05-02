@@ -9,7 +9,7 @@ class Password
         return substr(base64_encode(random_bytes(16)), 0, $len);
     }
     
-    public static function hash(string $password): bool
+    public static function hash(string $password): string
     {
         return password_hash($password, PASSWORD_BCRYPT);
     }

@@ -52,7 +52,7 @@ class JobPostCvSubmissionService
         $submissions = JobPostCvSubmission::findByAllByPostId($this->pdo, $id);
         return $submissions
             ? array_map(fn($sub) => $this->attachRequired($sub), $submissions)
-            : null;
+            : [];
     }
 
     public function findByAllByAlumniId(int $id): ?array
@@ -60,6 +60,6 @@ class JobPostCvSubmissionService
         $submissions = JobPostCvSubmission::findByAllByAlumniId($this->pdo, $id);
         return $submissions
             ? array_map(fn($sub) => $this->attachRequired($sub), $submissions)
-            : null;
+            : [];
     }
 }

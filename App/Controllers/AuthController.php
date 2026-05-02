@@ -30,7 +30,7 @@ class AuthController
         $user = User::findByEmail($this->pdo, $email);
 
         if (!$user)
-            HttpResponse::bad(['message' => 'Email or password must be incorrect.']);
+            HttpResponse::bad(['message' => 'Email or password might be incorrect.']);
 
         if (!$user->emailVerified)
             HttpResponse::forbidden(['message' => 'Unable to login. You need to verify your email first.']);

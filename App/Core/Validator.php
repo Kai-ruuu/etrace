@@ -11,15 +11,15 @@ class Validator
         $value = filter_var($value, FILTER_VALIDATE_INT);
 
         if ($value === false) {
-            HttpResponse::Unprocessable(['message' => $label . ' should be a valid whole number.']);
+            HttpResponse::unprocessable(['message' => $label . ' should be a valid whole number.']);
         }
         
         if ($minimum !== null && $value < $minimum) {
-            HttpResponse::Unprocessable(['message' => $label . ' should be at least ' . $minimum]);
+            HttpResponse::unprocessable(['message' => $label . ' should be at least ' . $minimum]);
         }
         
         if ($maximum !== null && $value > $maximum) {
-            HttpResponse::Unprocessable(['message' => $label . ' should not exceed ' . $maximum]);
+            HttpResponse::unprocessable(['message' => $label . ' should not exceed ' . $maximum]);
         }
         
         return $value;
@@ -32,15 +32,15 @@ class Validator
         $value = filter_var($value, FILTER_VALIDATE_FLOAT);
 
         if ($value === false) {
-            HttpResponse::Unprocessable(['message' => $label . ' should be a valid whole number.']);
+            HttpResponse::unprocessable(['message' => $label . ' should be a valid whole number.']);
         }
         
         if ($minimum !== null && $value < $minimum) {
-            HttpResponse::Unprocessable(['message' => $label . ' should be at least ' . $minimum]);
+            HttpResponse::unprocessable(['message' => $label . ' should be at least ' . $minimum]);
         }
         
         if ($maximum !== null && $value > $maximum) {
-            HttpResponse::Unprocessable(['message' => $label . ' should not exceed ' . $maximum]);
+            HttpResponse::unprocessable(['message' => $label . ' should not exceed ' . $maximum]);
         }
         
         return $value;
@@ -55,7 +55,7 @@ class Validator
         $falseVals = ['false', '0', 'no', 'low'];
         
         if (!in_array($value, $trueVals) && !in_array($value, $falseVals)) {
-            HttpResponse::Unprocessable(['message' => $label . ' should be a boolean-like value.']);
+            HttpResponse::unprocessable(['message' => $label . ' should be a boolean-like value.']);
         }
 
         if (in_array($value, $trueVals)) {
@@ -66,7 +66,7 @@ class Validator
             return false;
         }
 
-        HttpResponse::Unprocessable(['message' => $label . ' should be a boolean-like value.']);
+        HttpResponse::unprocessable(['message' => $label . ' should be a boolean-like value.']);
     }
 
     public static function string(string $label, ?string $value, ?int $minimum = null, ?int $maximum = null): ?string
@@ -74,11 +74,11 @@ class Validator
         if (empty($value)) return null;
         
         if ($minimum !== null && strlen($value) < $minimum) {
-            HttpResponse::Unprocessable(['message' => $label . ' should have at least ' . $minimum . ' characters.']);
+            HttpResponse::unprocessable(['message' => $label . ' should have at least ' . $minimum . ' characters.']);
         }
 
         if ($maximum !== null && strlen($value) > $maximum) {
-            HttpResponse::Unprocessable(['message' => $label . ' should not exceed ' . $maximum . ' characters.']);
+            HttpResponse::unprocessable(['message' => $label . ' should not exceed ' . $maximum . ' characters.']);
         }
 
         return $value;
@@ -94,7 +94,7 @@ class Validator
             return $value;
         }
         
-        return HttpResponse::Unprocessable(['message' => $label . ' should be a valid email address.']);
+        return HttpResponse::unprocessable(['message' => $label . ' should be a valid email address.']);
     }
 
     public static function enum(string $label, ?string $value, string $enumClass): mixed

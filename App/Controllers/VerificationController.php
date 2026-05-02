@@ -10,7 +10,6 @@ use App\Models\User;
 use App\Models\Verification;
 use App\Services\MailingService;
 use App\Services\UserService;
-use App\Utils\ArrayLogger;
 use DateTime;
 use PDO;
 
@@ -33,8 +32,6 @@ class VerificationController
 
         $verification = Verification::findByToken($this->pdo, $token);
 
-        ArrayLogger::log($verification->toArray());
-
         if (!$verification)
             HttpResponse::bad(['message' => 'Invalid verification token.']);
 
@@ -45,6 +42,10 @@ class VerificationController
             HttpResponse::bad(['message' => 'Verification link was already used.']);
 
         $user = User::findById($this->pdo, $verification->userId);
+        
+        if ($user->emailVerified)
+            HttpResponse::bad(['message' => 'Your email is already verified.']);
+
         $user->enabled = true;
         $user->emailVerified = true;
         $user->emailVerifiedAt = new DateTime();

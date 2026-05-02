@@ -24,6 +24,7 @@ use App\Controllers\SocialMediaController;
 use App\Controllers\SocialMediaPlatformController;
 use App\Controllers\SystemAdminController;
 use App\Controllers\TargetCourseController;
+use App\Controllers\UserController;
 use App\Controllers\VerificationController;
 use App\Core\App;
 use App\Core\Database;
@@ -42,6 +43,11 @@ $router = new Router($pdo);
 $router->get('/api/auth', AuthController::class, 'logout', [AllowedOnlyMiddleware::make([Role::SYSTEM_ADMIN, Role::DEAN, Role::PESO_STAFF, Role::COMPANY, Role::ALUMNI])]);
 $router->post('/api/auth', AuthController::class, 'authenticate');
 $router->get('/api/auth/me', AuthController::class, 'me', [AllowedOnlyMiddleware::make([Role::SYSTEM_ADMIN, Role::DEAN, Role::PESO_STAFF, Role::COMPANY, Role::ALUMNI])]);
+
+$router->patch('/api/user/update-password', UserController::class, 'updatePassword', [AllowedOnlyMiddleware::make([Role::SYSTEM_ADMIN, Role::DEAN, Role::PESO_STAFF, Role::COMPANY, Role::ALUMNI])]);
+$router->post('/api/user/send-password-reset-link', UserController::class, 'sendPasswordResetLink');
+$router->post('/api/user/send-verification-link', UserController::class, 'sendVerificationLink');
+$router->post('/api/user/reset-password', UserController::class, 'resetPassword');
 
 // email verification
 $router->get('/api/email-verification/{token}', VerificationController::class, 'verify');
