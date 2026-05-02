@@ -88,10 +88,10 @@ class UserController
             HttpResponse::bad(['message' => 'Invalid password reset token.']);
 
         if (new DateTime() > $passwordReset->expiresAt)
-            HttpResponse::bad(['message' => 'Verification link has expired.']);
+            HttpResponse::bad(['message' => 'Password reset link has expired.']);
 
         if ($passwordReset->used)
-            HttpResponse::bad(['message' => 'Verification link was already used.']);
+            HttpResponse::bad(['message' => 'Password reset link was already used.']);
 
         $user = User::findById($this->pdo, $passwordReset->userId);
         $updatedUser = User::updatePassword($this->pdo, $user->id, Password::hash($newPassword));
