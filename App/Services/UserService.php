@@ -5,6 +5,7 @@ namespace App\Services;
 use App\Core\Types\Link;
 use App\Core\Types\Role;
 use App\Models\Course;
+use App\Models\GraduateRecord;
 use App\Models\Occupation;
 use App\Models\OccupationState;
 use App\Models\ProfileAlumni;
@@ -137,6 +138,83 @@ class UserService
         return $user ? $userWithProfile : null;
     }
 
+    public function getSummaries(array $user): array
+    {
+        switch (Role::from($user['role']))
+        {
+            case Role::SYSTEM_ADMIN:
+                $isDefaultSysad = $user['email'] === $_ENV['SYSAD_EMAIL'];
+                $summaries = [
+                    'dean' => User::getSummary($this->pdo, Role::DEAN),
+                    'pstaff' => User::getSummary($this->pdo, Role::PESO_STAFF),
+                    'company' => User::getSummary($this->pdo, Role::COMPANY),
+                    'alumni' => User::getSummary($this->pdo, Role::ALUMNI),
+                ];
+                
+                if ($isDefaultSysad)
+                    $summaries['sysad'] = User::getSummary($this->pdo, Role::SYSTEM_ADMIN);
+
+                return $summaries;
+            case Role::DEAN:
+                return [
+                    'alumni' => User::getSummary($this->pdo, Role::ALUMNI),
+                    'course' => Course::getSummary($this->pdo, $user['profile']['school_id']),
+                    'record' => GraduateRecord::getSummary($this->pdo, $user['profile']['school_id']),
+                ];
+            case Role::PESO_STAFF:
+                return [
+                    'company' => User::getSummary($this->pdo, Role::COMPANY)
+                ];
+        }
+
+        return [];
+    }
+
+    public function getCompanyIndustryAnalytics(?bool $active): array
+    {
+        return ProfileCompany::getIndustryAnalytics($this->pdo, $active);
+    }
+
+    public function getCompanyVerificationAnalytics(?bool $active): array
+    {
+        return ProfileCompany::getVerificationAnalytics($this->pdo, $active);
+    }
+
+    public function getAlumniVerificationAnalytics(?bool $active, ?int $schoolId): array
+    {
+        return ProfileAlumni::getVerificationAnalytics($this->pdo, $active, $schoolId);
+    }
+
+    public function getAlumniCountByCourseAnalytics(?bool $active): array
+    {
+        $courses = Course::findAll($this->pdo);
+        $coursesInfo = array_map(fn($course) => [
+            'code' => $course->code,
+            'name' => $course->name
+        ], $courses);
+        $courseAlumniCounts = [];
+        
+        foreach ($courses as $course)
+        {
+            $courseAlumniCounts[] = ProfileAlumni::getCountByCourse($this->pdo, $active, $course->id);
+        }
+
+        return [
+            'courses' => $coursesInfo,
+            'counts' => $courseAlumniCounts
+        ];
+    }
+
+    public function getAlumniEmploymentAnalytics(?bool $active, ?int $batch, ?int $schoolId): array
+    {
+        return ProfileAlumni::getEmploymentAnalytics($this->pdo, $active, $batch, $schoolId);
+    }
+
+    public function getAlumniAlignmentAnalytics(?bool $active, ?int $batch, ?int $schoolId): array
+    {
+        return ProfileAlumni::getAlignmentAnalytics($this->pdo, $active, $batch, $schoolId);
+    }
+
     public function findByEmail(string $email): ?array
     {
         $user = User::findByEmail($this->pdo, $email);
@@ -223,11 +301,6 @@ class UserService
             $this->pdo->rollBack();
             throw new Exception($e->getMessage());
         }
-    }
-
-    public function createAlumni()
-    {
-
     }
 
     public function update(int $id, array $data): ?array

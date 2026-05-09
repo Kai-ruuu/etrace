@@ -7,6 +7,7 @@ use App\Core\Password;
 use App\Core\Request;
 use App\Core\Types\Link;
 use App\Core\Validator;
+use App\Models\Course;
 use App\Models\PasswordReset;
 use App\Models\User;
 use App\Models\Verification;
@@ -26,6 +27,61 @@ class UserController
         $this->pdo = $pdo;
         $this->service = new UserService($this->pdo);
         $this->mailingService = MailingService::forProd();
+    }
+
+    public function getSummaries(Request $req, array $cont): void
+    {
+        HttpResponse::ok($this->service->getSummaries($cont['user']));
+    }
+
+    public function getCompanyIndustryAnalytics(Request $req, array $cont): void
+    {
+        $active = Validator::bool('active', $req->fromQuery('active', null));
+        HttpResponse::ok($this->service->getCompanyIndustryAnalytics($active));
+    }
+
+    public function getCompanyVerificationAnalytics(Request $req, array $cont): void
+    {
+        $active = Validator::bool('active', $req->fromQuery('active', null));
+        HttpResponse::ok($this->service->getCompanyVerificationAnalytics($active));
+    }
+
+    public function getAlumniVerificationAnalytics(Request $req, array $cont): void
+    {
+        $active = Validator::bool('active', $req->fromQuery('active', null));
+        $schoolId = Validator::int('school_id', $req->fromQuery('school_id', null));
+
+        if ($schoolId !== null)
+        {
+            $existingCourse = Course::findById($this->pdo, $schoolId);
+
+            if (!$existingCourse)
+                HttpResponse::notFound(['message' => 'Course not found.']);
+        }
+        
+        HttpResponse::ok($this->service->getAlumniVerificationAnalytics($active, $schoolId));
+    }
+
+    public function getAlumniCountByCourseAnalytics(Request $req, array $cont): void
+    {
+        $active = Validator::bool('active', $req->fromQuery('active', null));
+        HttpResponse::ok($this->service->getAlumniCountByCourseAnalytics($active));
+    }
+
+    public function getAlumniEmploymentAnalytics(Request $req, array $cont): void
+    {
+        $active = Validator::bool('active', $req->fromQuery('active', null));
+        $batch = Validator::int('batch', $req->fromQuery('batch', null));
+        $schoolId = Validator::int('school_id', $req->fromQuery('school_id', null));
+        HttpResponse::ok($this->service->getAlumniEmploymentAnalytics($active, $batch, $schoolId));
+    }
+
+    public function getAlumniAlignmentAnalytics(Request $req, array $cont): void
+    {
+        $active = Validator::bool('active', $req->fromQuery('active', null));
+        $batch = Validator::int('batch', $req->fromQuery('batch', null));
+        $schoolId = Validator::int('school_id', $req->fromQuery('school_id', null));
+        HttpResponse::ok($this->service->getAlumniAlignmentAnalytics($active, $batch, $schoolId));
     }
 
     public function updatePassword(Request $req, array $cont): void

@@ -6,7 +6,7 @@ class Validator
 {
     public static function int(string $label, ?string $value, ?int $minimum = null, ?int $maximum = null): ?int
     {
-        if (empty($value)) return null;
+        if (empty($value) || $value === 'null') return null;
         
         $value = filter_var($value, FILTER_VALIDATE_INT);
 
@@ -48,7 +48,7 @@ class Validator
 
     public static function bool(string $label, ?string $value): ?bool
     {
-        if (empty($value)) return null;
+        if (empty($value) || $value === 'null') return null;
         
         $value = strtolower($value);
         $trueVals = ['true', '1', 'yes', 'high'];

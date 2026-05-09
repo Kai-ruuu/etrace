@@ -96,6 +96,24 @@ class Course implements Migratable
         return $row ? self::fromRow($row) : null;
     }
 
+    public static function getSummary(PDO $pdo, int $schoolId): array
+    {
+        $sql = $pdo->prepare('SELECT COUNT(id) FROM courses WHERE school_id = ?');
+        $sql->execute([$schoolId]);
+        $total = (int) $sql->fetchColumn();
+        
+        $sql = $pdo->prepare('SELECT COUNT(id) FROM courses WHERE school_id = ? AND archived = FALSE');
+        $sql->execute([$schoolId]);
+        $totalActive = (int) $sql->fetchColumn();
+        $totalArchived = $total - $totalActive;
+
+        return [
+            'total' => $total,
+            'active' => $totalActive,
+            'archived' => $totalArchived
+        ];
+    }
+
     public static function create(PDO $pdo, array $data): self
     {
         $sql = $pdo->prepare('

@@ -44,10 +44,20 @@ $router->get('/api/auth', AuthController::class, 'logout', [AllowedOnlyMiddlewar
 $router->post('/api/auth', AuthController::class, 'authenticate');
 $router->get('/api/auth/me', AuthController::class, 'me', [AllowedOnlyMiddleware::make([Role::SYSTEM_ADMIN, Role::DEAN, Role::PESO_STAFF, Role::COMPANY, Role::ALUMNI])]);
 
+// general
 $router->patch('/api/user/update-password', UserController::class, 'updatePassword', [AllowedOnlyMiddleware::make([Role::SYSTEM_ADMIN, Role::DEAN, Role::PESO_STAFF, Role::COMPANY, Role::ALUMNI])]);
 $router->post('/api/user/send-password-reset-link', UserController::class, 'sendPasswordResetLink');
 $router->post('/api/user/send-verification-link', UserController::class, 'sendVerificationLink');
 $router->post('/api/user/reset-password', UserController::class, 'resetPassword');
+
+// admins
+$router->get('/api/stats/summaries', UserController::class, 'getSummaries', [AllowedOnlyMiddleware::make([Role::SYSTEM_ADMIN, Role::DEAN, Role::PESO_STAFF])]);
+$router->get('/api/stats/company/ver-analytics', UserController::class, 'getCompanyVerificationAnalytics', [AllowedOnlyMiddleware::make([Role::SYSTEM_ADMIN, Role::PESO_STAFF])]);
+$router->get('/api/stats/company/industry-analytics', UserController::class, 'getCompanyIndustryAnalytics', [AllowedOnlyMiddleware::make([Role::SYSTEM_ADMIN, Role::PESO_STAFF])]);
+$router->get('/api/stats/alumni/ver-analytics', UserController::class, 'getAlumniVerificationAnalytics', [AllowedOnlyMiddleware::make([Role::SYSTEM_ADMIN, Role::DEAN])]);
+$router->get('/api/stats/alumni/count-by-course', UserController::class, 'getAlumniCountByCourseAnalytics', [AllowedOnlyMiddleware::make([Role::SYSTEM_ADMIN, Role::DEAN])]);
+$router->get('/api/stats/alumni/emp-analytics', UserController::class, 'getAlumniEmploymentAnalytics', [AllowedOnlyMiddleware::make([Role::SYSTEM_ADMIN, Role::DEAN])]);
+$router->get('/api/stats/alumni/alg-analytics', UserController::class, 'getAlumniAlignmentAnalytics', [AllowedOnlyMiddleware::make([Role::SYSTEM_ADMIN, Role::DEAN])]);
 
 // email verification
 $router->get('/api/email-verification/{token}', VerificationController::class, 'verify');

@@ -74,6 +74,24 @@ class User implements Migratable
         return $row ? self::fromRow($row) : null;
     }
 
+    public static function getSummary(PDO $pdo, Role $role): array
+    {
+        $sql = $pdo->prepare('SELECT COUNT(id) FROM users WHERE role = ?');
+        $sql->execute([$role->value]);
+        $total = (int) $sql->fetchColumn();
+
+        $sql = $pdo->prepare('SELECT COUNT(id) FROM users WHERE role = ? AND enabled = TRUE');
+        $sql->execute([$role->value]);
+        $totalActive = (int) $sql->fetchColumn();
+        $totalInactive = $total - $totalActive;
+        
+        return [
+            'total' => $total,
+            'active' => $totalActive,
+            'inactive' => $totalInactive
+        ];
+    }
+
     public static function findByEmail(PDO $pdo, string $email): ?self
     {
         $sql = $pdo->prepare('SELECT * FROM users WHERE email = ? LIMIT 1');

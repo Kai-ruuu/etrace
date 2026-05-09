@@ -240,7 +240,7 @@ class MailingService
                                                 <table cellpadding="0" cellspacing="0">
                                                     <tr>
                                                         <td style="background-color:#111827; border-radius:6px;">
-                                                            <a href="{$loginUrl}" style="display:inline-block; padding:14px 32px; font-size:14px; font-weight:600; color:#ffffff; text-decoration:none;">Login to Etrace+</a>
+                                                            <a href="{$loginUrl}" style="display:inline-block; padding:14px 32px; font-size:14px; font-weight:600; color:#ffffff; text-decoration:none;">Login to E-trace+</a>
                                                         </td>
                                                     </tr>
                                                 </table>
@@ -406,11 +406,90 @@ class MailingService
                                             </td>
                                         </tr>
                                     </table>
-
-                                    <p style="margin:0 0 12px; font-size:13px; color:#6b7280; line-height:1.5;">
-                                        <strong>What's next?</strong><br>
-                                        Once verified, you can complete your profile, upload your curriculum viate, and send it into job posts that are posted by our partner companies.
+                                </td>
+                            </tr>
+                            <tr>
+                                <td style="background-color:#f9fafb; border-top:1px solid #e5e7eb; padding:20px 32px;">
+                                    <p style="margin:0; font-size:12px; color:#9ca3af; line-height:1.5;">
+                                        <strong>Registered Email:</strong> {$uEmail}<br>
+                                        If you did not sign up for E-trace+, you can safely ignore this message.
                                     </p>
+                                </td>
+                            </tr>
+                        </table>
+                    </td>
+                </tr>
+            </table>
+        </body>
+        </html>
+        HTML;
+
+        return $this->send($uEmail, $userName, $this->username, $subject, $body);
+    }
+
+    public function sendPreverifiedAlumni(array $createInfo): bool
+    {
+        $uEmail   = $createInfo['email'];
+        $userName = htmlspecialchars($createInfo['first_name']);
+
+        $subject = "You're Pre-verified! - E-trace+";
+
+        $body = <<<HTML
+        <!DOCTYPE html>
+        <html lang="en">
+        <head>
+            <meta charset="UTF-8">
+            <meta name="viewport" content="width=device-width, initial-scale=1.0">
+            <title>{$subject}</title>
+        </head>
+        <body style="margin:0; padding:0; background-color:#f9fafb; font-family: Arial, sans-serif;">
+            <table width="100%" cellpadding="0" cellspacing="0" style="background-color:#f9fafb; padding: 40px 0;">
+                <tr>
+                    <td align="center">
+                        <table width="560" cellpadding="0" cellspacing="0" style="background-color:#ffffff; border-radius:8px; border: 1px solid #e5e7eb; overflow:hidden;">
+                            <tr>
+                                <td style="background-color:#ffffff; padding: 24px 32px; border-bottom: 1px solid #e5e7eb;">
+                                    <table width="100%" cellpadding="0" cellspacing="0">
+                                        <tr>
+                                            <td><span style="font-size:18px; font-weight:700; color:#111827; letter-spacing:1px;">E-trace+</span></td>
+                                            <td align="right">
+                                                <span style="display:inline-block; background-color:#dcfce7; color:#15803d; font-size:11px; font-weight:600; padding:4px 10px; border-radius:999px; text-transform:uppercase; letter-spacing:1px;">Alumni Portal</span>
+                                            </td>
+                                        </tr>
+                                    </table>
+                                </td>
+                            </tr>
+                            <tr>
+                                <td style="padding: 32px;">
+                                    <p style="margin:0 0 16px; font-size:14px; color:#6b7280;">Hi {$userName},</p>
+                                    <p style="margin:0 0 24px; font-size:15px; color:#111827; line-height:1.6;">
+                                        Great news! Your registration details matched our graduate records, and your account has been <strong>automatically pre-verified</strong>. This means you can skip the Dean's approval and get started right away.
+                                    </p>
+
+                                    <table width="100%" cellpadding="0" cellspacing="0" style="margin-bottom:24px;">
+                                        <tr>
+                                            <td style="background-color:#f0fdf4; border:1px solid #bbf7d0; border-left: 3px solid #22c55e; border-radius:6px; padding:20px;">
+                                                <p style="margin:0 0 8px; font-size:14px; font-weight:600; color:#166534;">What does this mean for you:</p>
+                                                <p style="margin:0; font-size:14px; color:#166534; line-height:1.6;">
+                                                    Your submitted information aligns with our official records, so your account has been verified without the need for manual review.
+                                                </p>
+                                            </td>
+                                        </tr>
+                                    </table>
+
+                                    <table width="100%" cellpadding="0" cellspacing="0" style="margin-bottom:24px;">
+                                        <tr>
+                                            <td style="background-color:#fefce8; border:1px solid #fde68a; border-left: 3px solid #eab308; border-radius:6px; padding:20px;">
+                                                <p style="margin:0 0 8px; font-size:14px; font-weight:600; color:#854d0e;">One last step:</p>
+                                                <p style="margin:0; font-size:14px; color:#854d0e; line-height:1.6;">
+                                                    To fully activate your account, please verify your email address. Kindly check your inbox for a separate verification email from us.
+                                                </p>
+                                                <p>
+                                                    If you don't see it, you may want to check your spam or junk folder.
+                                                </p>
+                                            </td>
+                                        </tr>
+                                    </table>
                                 </td>
                             </tr>
                             <tr>

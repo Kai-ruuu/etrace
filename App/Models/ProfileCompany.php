@@ -149,6 +149,73 @@ class ProfileCompany implements Migratable
         return $row ? self::fromRow($row) : null;
     }
 
+    public static function getVerificationAnalytics(PDO $pdo, ?bool $active): array
+    {
+        $bindings = $active !== null ? [$active ? 1 : 0] : [];
+        $where    = $active !== null ? 'WHERE u.enabled = ?' : '';
+        $and      = $active !== null ? 'AND' : 'WHERE';
+
+        $queries = [
+            'total'           => ['where' => '', 'condition' => '', 'bindings' => []],
+            'fully_verified'  => ['where' => $where, 'condition' => "$and ver_stat_sysad = 'Verified' AND ver_stat_pstaff = 'Verified'", 'bindings' => $bindings],
+            'sysad_pending'   => ['where' => $where, 'condition' => "$and ver_stat_sysad = 'Pending'",  'bindings' => $bindings],
+            'sysad_rejected'  => ['where' => $where, 'condition' => "$and ver_stat_sysad = 'Rejected'", 'bindings' => $bindings],
+            'pstaff_pending'  => ['where' => $where, 'condition' => "$and ver_stat_pstaff = 'Pending'",  'bindings' => $bindings],
+            'pstaff_rejected' => ['where' => $where, 'condition' => "$and ver_stat_pstaff = 'Rejected'", 'bindings' => $bindings],
+        ];
+
+        $results = [];
+        foreach ($queries as $key => $q) {
+            $sql = $pdo->prepare("
+                SELECT COUNT(companies.id)
+                FROM companies
+                JOIN users u ON companies.user_id = u.id
+                {$q['where']} {$q['condition']}
+            ");
+            $sql->execute($q['bindings']);
+            $results[$key] = (int) $sql->fetchColumn();
+        }
+
+        return $results;
+    }
+
+    public static function getIndustryAnalytics(PDO $pdo, ?bool $active): array
+    {
+        $industries = [
+            'Technology / IT', 'Finance / Banking / Insurance', 'Healthcare / Pharmaceuticals',
+            'Education / Research', 'Manufacturing / Industrial', 'Retail / E-commerce',
+            'Food & Beverage / Hospitality', 'Transportation / Logistics', 'Energy / Utilities',
+            'Media / Entertainment / Advertising', 'Government / Public Sector',
+            'Real Estate / Construction', 'Consulting / Professional Services', 'Nonprofit / NGO',
+            'Telecommunications'
+        ];
+
+        $activeBinding = $active !== null
+            ? [$active ? 1 : 0]
+            : [];
+        $activeCondition = $active !== null
+            ? 'AND u.enabled = ?'
+            : '';
+
+        $sql = $pdo->prepare("
+            SELECT COUNT(companies.id)
+            FROM companies
+            JOIN users u ON u.id = companies.user_id
+            WHERE industry = ?
+            {$activeCondition}
+        ");
+
+        $results = [];
+
+        foreach ($industries as $industry) {
+            $bindings = array_merge([$industry], $activeBinding);
+            $sql->execute($bindings);
+            $results[$industry] = (int) $sql->fetchColumn();
+        }
+
+        return $results;
+    }
+
     public static function create(PDO $pdo, array $data): self
     {
         $sql = $pdo->prepare('

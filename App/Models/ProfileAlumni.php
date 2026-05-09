@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Config\UploadsConfig;
 use App\Core\Types\CivilStatus;
 use App\Core\Types\EmploymentStatus;
 use App\Core\Types\Gender;
@@ -21,7 +22,7 @@ class ProfileAlumni implements Migratable
     public string $birthDate;
     public string $birthPlace;
     public Gender $gender;
-    public string $studentNumber;
+    public ?string $studentNumber;
     public string $phoneNumber;
     public int $courseId;
     public int $graduationYear;
@@ -123,11 +124,209 @@ class ProfileAlumni implements Migratable
         return $row ? self::fromRow($row) : null;
     }
 
+    public static function getVerificationAnalytics(PDO $pdo, ?bool $active, ?int $schoolId): array
+    {
+        $conditions = [];
+        $bindings   = [];
+
+        if ($active !== null) {
+            $conditions[] = 'u.enabled = ?';
+            $bindings[]   = $active ? 1 : 0;
+        }
+
+        if ($schoolId !== null) {
+            $conditions[] = 'c.school_id = ?';
+            $bindings[]   = $schoolId;
+        }
+
+        $baseWhere = count($conditions)
+            ? 'WHERE ' . implode(' AND ', $conditions)
+            : '';
+
+        $queries = [
+            'total'    => ['condition' => ''],
+            'verified' => ['condition' => "AND ver_stat_dean = 'Verified'"],
+            'pending'  => ['condition' => "AND ver_stat_dean = 'Pending'"],
+            'rejected' => ['condition' => "AND ver_stat_dean = 'Rejected'"],
+        ];
+
+        $results = [];
+        foreach ($queries as $key => $q) {
+            $where = $baseWhere;
+
+            if ($q['condition'] !== '') {
+                $where .= $baseWhere
+                    ? " {$q['condition']}"
+                    : ' WHERE ' . ltrim($q['condition'], 'AND ');
+            }
+
+            $sql = $pdo->prepare("
+                SELECT COUNT(alumni.id)
+                FROM alumni
+                JOIN users u ON alumni.user_id = u.id
+                JOIN courses c ON alumni.course_id = c.id
+                {$where}
+            ");
+            $sql->execute($bindings);
+            $results[$key] = (int) $sql->fetchColumn();
+        }
+
+        return $results;
+    }
+
+    public static function getCountByCourse(PDO $pdo, ?bool $active, int $courseId): int
+    {
+        $bindings = [$courseId];
+        $where    = 'WHERE alumni.course_id = ?';
+
+        if ($active !== null) {
+            $bindings[] = $active ? 1 : 0;
+            $where .= ' AND u.enabled = ?';
+        }
+
+        $sql = $pdo->prepare("
+            SELECT COUNT(alumni.id)
+            FROM alumni
+            JOIN users u ON alumni.user_id = u.id
+            $where
+        ");
+        $sql->execute($bindings);
+
+        return (int) $sql->fetchColumn();
+    }
+
+    public static function getEmploymentAnalytics(PDO $pdo, ?bool $active, ?int $batch, ?int $schoolId): array
+    {
+        $conditions = ['employment_status = ?'];
+        $baseBindings = [];
+
+        if ($active !== null) {
+            $conditions[] = 'u.enabled = ?';
+            $baseBindings[] = $active ? 1 : 0;
+        }
+
+        if ($batch !== null) {
+            $conditions[] = 'alumni.graduation_year = ?';
+            $baseBindings[] = $batch;
+        }
+
+        if ($schoolId !== null) {
+            $conditions[] = 'c.school_id = ?';
+            $baseBindings[] = $schoolId;
+        }
+
+        $where    = 'WHERE ' . implode(' AND ', $conditions);
+        $join     = $schoolId !== null
+            ? 'JOIN courses c ON alumni.course_id = c.id'
+            : '';
+        $statuses = ['Employed', 'Self-employed', 'Unemployed'];
+        $results  = ['deceased' => 0];
+
+        $sql = $pdo->prepare("
+            SELECT COUNT(alumni.id)
+            FROM alumni
+            JOIN users u ON u.id = alumni.user_id
+            {$join}
+            {$where}
+        ");
+
+        foreach ($statuses as $status) {
+            $bindings = array_merge([$status], $baseBindings);
+            $sql->execute($bindings);
+            $results[strtolower($status)] = (int) $sql->fetchColumn();
+        }
+
+        if ($batch !== null)
+            $records = GraduateRecord::findByBatch($pdo, $batch);
+        else
+            $records = GraduateRecord::findAll($pdo);
+
+        if (empty($records))
+            return $results;
+
+        foreach ($records as $record) {
+            $filepath = UploadsConfig::folder('graduate_record') . '/' . $record->filename;
+            $csvFile  = file($filepath);
+
+            if ($csvFile === false) {
+                error_log("CSV file not found: $filepath");
+                continue;
+            }
+
+            $rows = array_map("str_getcsv", $csvFile);
+            array_shift($rows);
+
+            foreach ($rows as $row) {
+                if (empty($row) || (count($row) === 1 && trim($row[0]) === ''))
+                    continue;
+
+                if (strcasecmp(trim(end($row)), 'Yes') === 0)
+                    $results['deceased']++;
+            }
+        }
+
+        return $results;
+    }
+
+    public static function getAlignmentAnalytics(PDO $pdo, ?bool $active, ?int $batch, ?int $schoolId): array
+    {
+        $schoolJoin     = $schoolId !== null ? "JOIN schools s ON s.id = c.school_id AND s.id = ?" : "";
+        $schoolBindings = $schoolId !== null ? [$schoolId] : [];
+
+        $batchCondition  = $batch !== null ? "AND a.graduation_year = ?" : "";
+        $activeCondition = $active !== null ? "AND EXISTS (SELECT 1 FROM users u WHERE u.id = a.user_id AND u.enabled = ?)" : "";
+
+        $bindings = [];
+        if ($batch !== null)  $bindings[] = $batch;
+        if ($active !== null) $bindings[] = $active ? 1 : 0;
+
+        $sql = $pdo->prepare("
+            SELECT
+                c.code,
+                COUNT(DISTINCT a.id) AS total,
+                COUNT(DISTINCT CASE
+                    WHEN co.occupation_id IS NOT NULL THEN a.id
+                END) AS aligned
+            FROM courses c
+            {$schoolJoin}
+            LEFT JOIN alumni a
+                ON a.course_id = c.id
+                AND (a.employment_status = 'Employed' OR a.employment_status = 'Self-employed')
+                {$batchCondition}
+                {$activeCondition}
+            LEFT JOIN occupation_states os
+                ON os.alumni_id = a.id AND os.is_current = TRUE
+            LEFT JOIN course_occupations co
+                ON co.course_id = c.id AND co.occupation_id = os.occupation_id
+            WHERE c.archived = FALSE
+            GROUP BY c.id, c.code
+        ");
+
+        $sql->execute(array_merge($schoolBindings, $bindings));
+        $rows = $sql->fetchAll(PDO::FETCH_ASSOC);
+
+        $aligned    = [];
+        $notAligned = [];
+
+        foreach ($rows as $row) {
+            $code              = $row['code'];
+            $total             = (int) $row['total'];
+            $alignedCount      = (int) $row['aligned'];
+            $aligned[$code]    = $alignedCount;
+            $notAligned[$code] = $total - $alignedCount;
+        }
+
+        return [
+            'aligned'     => $aligned,
+            'not_aligned' => $notAligned,
+        ];
+    }
+    
     public static function create(PDO $pdo, array $data): self
     {
         $sql = $pdo->prepare('
-            INSERT INTO alumni (user_id, name_extension, first_name, middle_name, last_name, birth_date, birth_place, gender, student_number, phone_number, course_id, graduation_year, civil_status, address, employment_status, profile_picture, cv)
-            VALUES (:user_id, :name_extension, :first_name, :middle_name, :last_name, :birth_date, :birth_place, :gender, :student_number, :phone_number, :course_id, :graduation_year, :civil_status, :address, :employment_status, :profile_picture, :cv)
+            INSERT INTO alumni (user_id, name_extension, first_name, middle_name, last_name, birth_date, birth_place, gender, student_number, phone_number, course_id, graduation_year, civil_status, address, employment_status, profile_picture, cv, ver_stat_dean)
+            VALUES (:user_id, :name_extension, :first_name, :middle_name, :last_name, :birth_date, :birth_place, :gender, :student_number, :phone_number, :course_id, :graduation_year, :civil_status, :address, :employment_status, :profile_picture, :cv, :ver_stat_dean)
         ');
 
         $sql->execute([
@@ -148,6 +347,7 @@ class ProfileAlumni implements Migratable
             ':employment_status' => $data['employment_status'],
             ':profile_picture'   => $data['profile_picture'],
             ':cv'                => $data['cv'],
+            ':ver_stat_dean'     => $data['ver_stat_dean'],
         ]);
 
         return self::findById($pdo, (int) $pdo->lastInsertId());

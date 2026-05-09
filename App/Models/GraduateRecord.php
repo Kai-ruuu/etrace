@@ -56,7 +56,7 @@ class GraduateRecord implements Migratable
 
     public static function findAll(PDO $pdo): array
     {
-        $sql = $pdo->prepare('SELECT * FROM graduate_records');
+        $sql = $pdo->prepare('SELECT * FROM graduate_records WHERE archived = FALSE');
         $sql->execute();
 
         return array_map(fn($row) => self::fromRow($row), $sql->fetchAll());
@@ -78,6 +78,44 @@ class GraduateRecord implements Migratable
 
         $row = $sql->fetch();
         return $row ? self::fromRow($row) : null;
+    }
+
+    public static function findByBatch(PDO $pdo, int $batch): array
+    {
+        $sql = $pdo->prepare('SELECT * FROM graduate_records WHERE graduation_year = ?');
+        $sql->execute([$batch]);
+
+        return array_map(fn($row) => self::fromRow($row), $sql->fetchAll());
+    }
+
+    public static function getSummary(PDO $pdo, int $schoolId): array
+    {
+        $sql = $pdo->prepare('
+            SELECT COUNT(*)
+            FROM graduate_records
+            JOIN courses c ON c.id = graduate_records.course_id
+            WHERE c.school_id = ?
+        ');
+        $sql->execute([$schoolId]);
+        $total = (int) $sql->fetchColumn();
+        
+        $sql = $pdo->prepare('
+            SELECT COUNT(*)
+            FROM graduate_records
+            JOIN courses c ON c.id = graduate_records.course_id
+            WHERE
+                c.school_id = ? AND
+                graduate_records.archived = FALSE
+        ');
+        $sql->execute([$schoolId]);
+        $totalActive = (int) $sql->fetchColumn();
+        $totalArchived = $total - $totalActive;
+
+        return [
+            'total' => $total,
+            'active' => $totalActive,
+            'archived' => $totalArchived
+        ];
     }
 
     public static function create(PDO $pdo, array $data): self

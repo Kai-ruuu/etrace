@@ -23,6 +23,7 @@ use App\Models\RejectionMessageDean;
 use App\Models\RejectionMessageDeanAppeal;
 use App\Models\User;
 use App\Models\Verification;
+use App\Services\AlumniPreverifyingService;
 use App\Services\MailingService;
 use App\Services\ProfileAlumniService;
 use App\Services\UserService;
@@ -36,13 +37,15 @@ class AlumniController
     private PDO $pdo;
     private ProfileAlumniService $service;
     private UserService $userService;
+    private AlumniPreverifyingService $alumniPreverifyingService;
     private MailingService $mailingService;
     
     public function __construct(PDO $pdo)
     {
         $this->pdo = $pdo;
-        $this->service = new ProfileAlumniService($this->pdo);
         $this->userService = new UserService($this->pdo);
+        $this->service = new ProfileAlumniService($this->pdo);
+        $this->alumniPreverifyingService = new AlumniPreverifyingService($this->pdo);
         $this->mailingService = MailingService::forProd();
     }
 
@@ -96,7 +99,7 @@ class AlumniController
         $lastName = Validator::requiredString('Last Name', $req->fromBody('last_name'), 1, 50);
         $birthPlace = Validator::requiredString('Birth Place', $req->fromBody('birth_place'), 1, 512);
         $gender = Validator::requiredEnum('Gender', $req->fromBody('gender'), Gender::class);
-        $studentNumber = Validator::requiredString('Student Number', $req->fromBody('student_number'), 5, 255);
+        $studentNumber = Validator::string('Student Number', $req->fromBody('student_number'), 5, 255);
         $phoneNumber = Validator::requiredString('Phone Number', $req->fromBody('phone_number'), 11, 25);
         $courseId = Validator::requiredInt('Course ID', $req->fromBody('course_id'), 1);
         $graduationYear = Validator::requiredInt('Batch', $req->fromBody('graduation_year'), 2007, (int) date('Y'));
@@ -105,6 +108,10 @@ class AlumniController
         $employmentStatus = Validator::requiredEnum('Employment Status', $req->fromBody('employment_status'), EmploymentStatus::class);
         $socialMedias = Validator::requiredJson('Social Media Links', $req->fromBody('social_medias'));
         $occupations = Validator::requiredJson('Occupations', $req->fromBody('occupations'));
+
+        // prevent registrations with institutional emails
+        if (str_contains($email, '@citycollegeoftagaytay.edu.ph'))
+            HttpResponse::bad(['message' => 'Using institutional email is prohibited. Please use your personal email.']);
 
         $uploads = new UploadHandler([
             new Upload('Profile Picture',  'profile_picture', UploadsConfig::folder('profile_picture'), [Mime::PNG, Mime::JPG, Mime::JPEG]),
@@ -136,38 +143,55 @@ class AlumniController
             HttpResponse::bad(['message' => "You must be at least 21 years old to register."]);
         }
 
+        $createInfo = [
+            'email' => $email,
+            'password' => $password,
+            'name_extension' => $nameExtension,
+            'first_name' => $firstName,
+            'middle_name' => $middleName,
+            'last_name' => $lastName,
+            'birth_date' => $birthDate,
+            'birth_place' => $birthPlace,
+            'gender' => $gender->value,
+            'student_number' => $studentNumber,
+            'phone_number' => $phoneNumber,
+            'course_id' => $courseId,
+            'graduation_year' => $graduationYear,
+            'civil_status' => $civilStatus->value,
+            'address' => $address,
+            'employment_status' => $employmentStatus->value,
+            'profile_picture' => $uploads->getFilename('profile_picture'),
+            'cv' => $uploads->getFilename('cv'),
+            'social_medias' => $socialMedias,
+            'occupations' => $occupations,
+            'enabled' => false
+        ];
+
+        $verStatDean = VerificationStatus::PENDING->value;
+
         try {
-            $newAlumni = $this->service->create([
-                'email' => $email,
-                'password' => $password,
-                'name_extension' => $nameExtension,
-                'first_name' => $firstName,
-                'middle_name' => $middleName,
-                'last_name' => $lastName,
-                'birth_date' => $birthDate,
-                'birth_place' => $birthPlace,
-                'gender' => $gender->value,
-                'student_number' => $studentNumber,
-                'phone_number' => $phoneNumber,
-                'course_id' => $courseId,
-                'graduation_year' => $graduationYear,
-                'civil_status' => $civilStatus->value,
-                'address' => $address,
-                'employment_status' => $employmentStatus->value,
-                'profile_picture' => $uploads->getFilename('profile_picture'),
-                'cv' => $uploads->getFilename('cv'),
-                'social_medias' => $socialMedias,
-                'occupations' => $occupations,
-                'enabled' => false
-            ]);
+            $verStatDean = $this->alumniPreverifyingService->preverify($createInfo);
+        } catch (Exception $e) {
+            error_log($e->getMessage());
+        }
+
+        $createInfo['ver_stat_dean'] = $verStatDean;
+        
+        try {
+            $newAlumni = $this->service->create($createInfo);
             $uploads->commit();
             $token = substr(bin2hex(random_bytes(16)), 0, 8);
             $verificationLink = Link::EMAIL_VERIFICATION->value . $token;
+
             Verification::create($this->pdo, [
                 'user_id' => $newAlumni['id'],
                 'token'   => $token
             ]);
             $this->mailingService->sendNewlyRegisteredAlumniWithEmailVerification($newAlumni, $verificationLink);
+            
+            if ($verStatDean === 'Verified')
+                $this->mailingService->sendPreverifiedAlumni($createInfo);
+            
             HttpResponse::ok($newAlumni);
         } catch (Exception $e) {
             error_log($e->getMessage());
