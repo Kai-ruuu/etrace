@@ -4,7 +4,7 @@ namespace App\Core;
 
 class AuthCookie
 {
-    public static function set($value)
+    public static function set(string $value)
     {
         setcookie("token", $value, [
             "expires"  => time() + 3600,
@@ -26,7 +26,7 @@ class AuthCookie
         ]);
     }
     
-    public static function get($key) {
+    public static function get(string $key) {
         return $_COOKIE[$key] ?? null;
     }
 }

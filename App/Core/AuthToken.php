@@ -26,7 +26,7 @@ class AuthToken
         return JWT::encode($payload, self::secret(), "HS256");
     }
 
-    public static function decode($token)
+    public static function decode(string $token)
     {
         try {
             $decoded = JWT::decode($token, new Key(self::secret(), "HS256"));
