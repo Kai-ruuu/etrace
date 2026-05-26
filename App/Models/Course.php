@@ -3,7 +3,6 @@
 namespace App\Models;
 
 use App\Core\Migratable;
-use App\Utils\ArrayLogger;
 use DateTime;
 use PDO;
 
