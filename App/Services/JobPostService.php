@@ -11,7 +11,6 @@ use App\Models\ProfileCompany;
 use App\Models\Qualification;
 use App\Models\TargetCourse;
 use App\Utils\ArrayLogger;
-use Exception;
 use PDO;
 use PDOException;
 

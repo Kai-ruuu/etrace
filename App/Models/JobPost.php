@@ -167,7 +167,8 @@ class JobPost implements Migratable
                 work_employment_type = ?,
                 slots                = ?,
                 additional_info      = ?,
-                open                 = ?
+                open                 = ?,
+                open_until           = ?
             WHERE id = ?
         ');
 
@@ -183,6 +184,7 @@ class JobPost implements Migratable
             $data['slots'],
             $data['additional_info'],
             $data['open'],
+            $data['open_until'],
             $id,
         ]);
 

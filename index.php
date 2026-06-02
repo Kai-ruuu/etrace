@@ -34,10 +34,11 @@ use App\Middlewares\AllowedOnlyMiddleware;
 
 $allowedOrigins = [
     "http://localhost:5173",
+    "http://192.168.1.37:5173",
 ];
 $database = Database::forDev();
 $pdo = $database->connect();
-$router = new Router($pdo);
+$router = new Router($pdo, rateLimitingEnabled: false);
 
 // auth
 $router->get('/api/auth', AuthController::class, 'logout', [AllowedOnlyMiddleware::make([Role::SYSTEM_ADMIN, Role::DEAN, Role::PESO_STAFF, Role::COMPANY, Role::ALUMNI])]);

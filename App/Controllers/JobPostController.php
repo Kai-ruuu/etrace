@@ -100,6 +100,8 @@ class JobPostController
         $jobPostId = Validator::requiredInt('Job Post ID', $req->fromParams('id'), 1);
 
         $jobPost = JobPost::findById($this->pdo, $jobPostId);
+
+        $dateNow = new DateTime();
         
         if (!$jobPost)
             HttpResponse::notFound(['message' => 'Job post not found.']);
@@ -107,7 +109,7 @@ class JobPostController
         if ($profileId !== $jobPost->companyId)
             HttpResponse::forbidden(['message' => 'You are not allowed to perform this action.']);
         
-        if ($jobPost->open)
+        if ($jobPost->open && $dateNow <= $jobPost->openUntil)
             HttpResponse::conflict(['message' => 'Job post is already opened.']);
 
         try {
@@ -115,8 +117,6 @@ class JobPostController
         } catch (Exception $e) {
             HttpResponse::unprocessable(['message' => 'Invalid open until date format.']);
         }
-
-        $dateNow = new DateTime();
 
         if ($openUntil <= $dateNow)
             HttpResponse::bad(['message' => 'Open until date should not be in the past or today.']);

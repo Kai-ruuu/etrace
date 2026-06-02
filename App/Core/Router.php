@@ -9,6 +9,7 @@ class Router
     private PDO $pdo;
     
     private int $rateLimit;
+    private bool $rateLimitingEnabled = true;
     private int $rateLimitWindow = 60;
     private string $storagePath;
     
@@ -17,11 +18,13 @@ class Router
 
     public function __construct(
         PDO $pdo,
+        bool $rateLimitingEnabled = true,
         int $rateLimit = 60,
         string $storagePath = '/tmp/router_rate_limits'
     )
     {
         $this->pdo = $pdo;
+        $this->rateLimitingEnabled = $rateLimitingEnabled;
         $this->rateLimit   = $rateLimit;
         $this->storagePath = $storagePath;
 
@@ -70,7 +73,7 @@ class Router
 
     public function dispatch(): void
     {
-        if (!$this->checkRateLimit())
+        if ($this->rateLimitingEnabled && !$this->checkRateLimit())
             Response::json(['message' => 'Too Many Requests. Limit: ' . $this->rateLimit . ' rpm.'], 429);
 
         $httpMethod  = $_SERVER['REQUEST_METHOD'] ?? 'GET';
